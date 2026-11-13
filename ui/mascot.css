@@ -1,0 +1,145 @@
+/* 칩이, the widget's mascot (drawn by mascot.js). The host element carries
+   the mood (`data-mood`) and the motion switches (`paused`, `still`). */
+.mascot {
+  /* 칩이 keeps the same colours in both themes. */
+  --chip-line: #5a4030;
+  --chip-body: #fffdf6;
+  --chip-hot: #ffc2ca;
+  --chip-pin: #f7d36d;
+  --chip-blush: #f5a9b8;
+  --chip-drop: #8dc3ee;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  pointer-events: none;
+}
+
+.chip {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.chip .ground { fill: var(--ground); }
+.chip .pins rect { fill: var(--chip-pin); stroke: var(--chip-line); stroke-width: 2; }
+.chip .shell { fill: var(--chip-body); stroke: var(--chip-line); stroke-width: 2.6; }
+.chip .notch { fill: var(--chip-pin); stroke: var(--chip-line); stroke-width: 2; stroke-linejoin: round; }
+.chip .blush { fill: var(--chip-blush); }
+.chip .open rect { fill: var(--chip-line); }
+.chip .shut path,
+.chip .brows path,
+.chip .mouth,
+.chip .steam path {
+  fill: none;
+  stroke: var(--chip-line);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chip .m-busy { fill: var(--chip-line); stroke: none; }
+.chip .sweat { fill: var(--chip-drop); stroke: var(--chip-line); stroke-width: 1.6; stroke-linejoin: round; }
+.chip .steam path { stroke: var(--muted); }
+
+/* Each mood shows its own parts. */
+.chip .steam,
+.chip .sweat,
+.chip .brows,
+.chip .shut,
+.chip .m-busy,
+.chip .m-hot {
+  display: none;
+}
+[data-mood="busy"] .chip .m-calm,
+[data-mood="hot"] .chip .m-calm,
+[data-mood="hot"] .chip .open {
+  display: none;
+}
+[data-mood="busy"] .chip .brows,
+[data-mood="busy"] .chip .sweat,
+[data-mood="busy"] .chip .m-busy,
+[data-mood="hot"] .chip .shut,
+[data-mood="hot"] .chip .steam,
+[data-mood="hot"] .chip .m-hot {
+  display: inline;
+}
+[data-mood="hot"] .chip .shell {
+  fill: var(--chip-hot);
+}
+
+/* Movement is drawn in a few held steps, like cels, not tweened: it reads as
+   hand animation, and every step is a repaint that costs CPU in the web,
+   GPU and app processes (the breathing alone measured about 1% of a core at
+   twice this many steps). Steps of one mood fall on the same instants.
+   Everything moves inside the one small SVG; no element gets its own
+   compositing layer. */
+.chip .whole,
+.chip .open,
+.chip .sweat,
+.chip .steam {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.chip .whole {
+  animation: breathe 4.6s steps(2) infinite;
+}
+[data-mood="busy"] .chip .whole {
+  animation: bob 0.6s steps(2) infinite alternate;
+}
+[data-mood="hot"] .chip .whole {
+  animation: shake 2.4s steps(1) infinite;
+}
+[data-mood="busy"] .chip .sweat {
+  animation: drip 1.2s steps(4) infinite;
+}
+[data-mood="hot"] .chip .steam {
+  animation: steam 1.6s steps(4) infinite;
+}
+
+/* A blink: main.js adds the class for one short cel every few seconds. */
+.chip .open {
+  transform-origin: 50% 50%;
+}
+.chip.blink .open {
+  transform: scaleY(0.14);
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02, 1.04); }
+}
+@keyframes bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-3px); }
+}
+@keyframes shake {
+  0%, 20%, 100% { transform: none; }
+  4% { transform: rotate(-5deg) translateX(-1px); }
+  8% { transform: rotate(4deg) translateX(1px); }
+  12% { transform: rotate(-4deg) translateX(-1px); }
+  16% { transform: rotate(5deg) translateX(1px); }
+}
+@keyframes drip {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(8px); opacity: 0; }
+}
+@keyframes steam {
+  from { transform: translateY(3px); opacity: 0; }
+  40% { opacity: 0.9; }
+  to { transform: translateY(-3px); opacity: 0; }
+}
+
+/* 칩이 holds still while the window is not showing, and always when its
+   constant movement is switched off (see mountMascot). */
+.paused .chip * {
+  animation-play-state: paused;
+}
+.still .chip * {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip * {
+    animation: none !important;
+  }
+}

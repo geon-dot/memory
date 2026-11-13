@@ -1,29 +1,61 @@
+/* Look: a paper sticker sheet. Warm pastel page, cream cards, one brown line
+   colour for every outline, flat offset shadows (no blur, nothing
+   translucent). See docs/design/reference-notes.md for where the numbers
+   come from. */
 :root {
   color-scheme: light dark;
-  --bg: #f5f6f8;
-  --bar: #eceef2;
-  --text: #1c2030;
-  --muted: #6b7286;
-  --track: #dfe2e8;
-  --cpu: #1f9d63;
-  --gpu: #2f6fd6;
-  --mem: #b97a12;
-  --disk: #7a4fd0;
-  --hot: #d6453d;
+  --page: #ffe9a6;
+  --dot: rgba(255, 255, 255, 0.55);
+  --card: #fff8e6;
+  --ink: #4a3524;
+  --line: #6b4f3a;
+  --muted: #8a6a50;
+  --track: #f5e6c8;
+  --well: #ffffff;
+  --lift: rgba(107, 79, 58, 0.35);
+  --bubble-line: #f5a9b8;
+  --btn: #ffffff;
+  --btn-on: #f7d36d;
+  --cpu: #f5a9b8;
+  --cpu-soft: #ffd5dc;
+  --gpu: #8dc3ee;
+  --gpu-soft: #dcedfc;
+  --mem: #f7d36d;
+  --mem-soft: #ffeebb;
+  --disk: #a6d896;
+  --disk-soft: #dff1d8;
+  --hot: #e8607c;
+  --hot-ink: #ad4259;
+  --tag-ink: #4a3524;
+  --ground: rgba(107, 79, 58, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1e26;
-    --bar: #23262f;
-    --text: #e6e8ee;
-    --muted: #8b92a5;
-    --track: #30343f;
-    --cpu: #4cc38a;
-    --gpu: #6aa9ff;
-    --mem: #e0a84c;
-    --disk: #b58cf0;
-    --hot: #ff6b61;
+    --page: #2b211c;
+    --dot: rgba(255, 236, 205, 0.06);
+    --card: #3b2e27;
+    --ink: #fbeedd;
+    --line: #17100c;
+    --muted: #cbb096;
+    --track: #2b211c;
+    --well: #2b211c;
+    --lift: rgba(0, 0, 0, 0.45);
+    --bubble-line: #f5a9b8;
+    --btn: #4a3a31;
+    --btn-on: #f7d36d;
+    --cpu: #f29bb0;
+    --cpu-soft: #f29bb0;
+    --gpu: #86bfee;
+    --gpu-soft: #86bfee;
+    --mem: #f5cf63;
+    --mem-soft: #f5cf63;
+    --disk: #a3d892;
+    --disk-soft: #a3d892;
+    --hot: #ff6f8a;
+    --hot-ink: #ff8fa5;
+    --tag-ink: #2b211c;
+    --ground: rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -39,112 +71,189 @@ body {
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font: 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  border: 1.5px solid var(--line);
+  background: var(--page);
+  color: var(--ink);
+  /* A rounded system face where there is one (macOS); elsewhere the system
+     sans, which the heavy weight keeps close in colour. */
+  font: 700 12px/1.25 ui-rounded, "SF Pro Rounded", "Segoe UI Variable Text", "Segoe UI",
+    "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
 }
 
-/* Title bar: the whole strip drags the window. */
-.bar {
+/* Top strip: 칩이, what it says, and the two window buttons. The whole strip
+   drags the window. */
+.top {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 2px;
-  height: 28px;
-  padding: 0 6px 0 12px;
-  background: var(--bar);
+  height: 62px;
+  padding: 4px 8px 0 10px;
 }
 
-.title {
-  flex: 1;
-  font-weight: 600;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: var(--muted);
+/* The page's polka dots, drawn once behind the top strip. As a repeating
+   gradient over the whole page they cost the web process about 7 MiB
+   (measured), and the cards cover most of the page anyway. */
+.dots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.dots circle {
+  fill: var(--dot);
+}
+.top > :not(.dots) {
+  position: relative;
 }
 
-.icon-btn {
+.say {
+  position: relative;
+  margin: 0 auto 0 9px;
+  padding: 4px 11px 5px;
+  border: 2px solid var(--bubble-line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 2px 0 var(--lift);
+  font-size: 13px;
+  white-space: nowrap;
+  transform: rotate(-2deg);
+}
+
+/* The bubble's tail: a small square turned 45°, two of its edges drawn. */
+.say::before {
+  content: "";
+  position: absolute;
+  left: -6.5px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  border-left: 2px solid var(--bubble-line);
+  border-bottom: 2px solid var(--bubble-line);
+  background: var(--card);
+  transform: rotate(45deg);
+}
+
+.say.pop {
+  animation: pop 0.14s ease-out;
+}
+
+.round-btn {
+  flex: none;
+  align-self: flex-start;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  margin: 3px 0 0 5px;
   padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--btn);
+  box-shadow: 0 2px 0 var(--lift);
+  color: var(--ink);
 }
 
-.icon-btn svg {
+.round-btn svg {
   width: 12px;
   height: 12px;
   fill: currentColor;
 }
 
-.icon-btn:hover {
-  background: var(--track);
-  color: var(--text);
+.round-btn .x {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
-.icon-btn[aria-pressed="true"] {
-  color: var(--gpu);
+.round-btn:hover {
+  background: var(--cpu-soft);
+  color: #4a3524;
+}
+
+.round-btn:active,
+.round-btn[aria-pressed="true"] {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.round-btn[aria-pressed="true"] {
+  background: var(--btn-on);
+  color: #4a3524;
 }
 
 main {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px 12px;
+  gap: 8px;
+  padding: 2px 10px 0;
 }
 
-.row {
+.card {
   --accent: var(--muted);
+  --soft: var(--track);
+  min-width: 0;
+  padding: 7px 10px 9px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 3px 0 var(--lift);
 }
-.row.cpu { --accent: var(--cpu); }
-.row.gpu { --accent: var(--gpu); }
-.row.mem { --accent: var(--mem); }
-.row.disk { --accent: var(--disk); }
+.card.cpu { --accent: var(--cpu); --soft: var(--cpu-soft); }
+.card.gpu { --accent: var(--gpu); --soft: var(--gpu-soft); }
+.card.mem { --accent: var(--mem); --soft: var(--mem-soft); }
+.card.disk { --accent: var(--disk); --soft: var(--disk-soft); }
 
 .line {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   height: 20px;
 }
 
-.label {
-  width: 34px;
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--tag-ink);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
+  letter-spacing: 0.03em;
 }
 
 .value {
-  width: 40px;
-  text-align: right;
-  font-weight: 600;
-}
-
-.value.wide {
-  flex: 1;
-  width: auto;
+  font-size: 17px;
+  font-weight: 800;
 }
 
 .spark {
-  flex: 1;
-  min-width: 0;
-  height: 20px;
-  border-bottom: 1px solid var(--track);
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin-top: 5px;
+  border-bottom: 1.5px solid var(--track);
+  overflow: visible;
+}
+
+.spark polygon {
+  fill: var(--soft);
 }
 
 .spark polyline {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.5;
+  stroke-width: 2;
   stroke-linejoin: round;
+  stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 
@@ -152,25 +261,25 @@ main {
   visibility: hidden;
 }
 
-/* One thin bar per core, all the same width; machines with many cores get a
+/* One bar per core, all the same width; machines with many cores get a
    second line, and anything beyond that is clipped rather than growing the
    window. */
 .cores {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(4px, 1fr));
-  gap: 2px;
-  margin-top: 5px;
-  max-height: 22px;
+  grid-template-columns: repeat(auto-fit, minmax(5px, 1fr));
+  gap: 3px;
+  margin-top: 6px;
+  max-height: 27px;
   overflow: hidden;
 }
 
 .core {
-  height: 10px;
-  border-radius: 2px;
-  background: var(--track);
-  overflow: hidden;
   display: flex;
   align-items: flex-end;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
 }
 
 .core i {
@@ -179,28 +288,57 @@ main {
   background: var(--accent);
 }
 
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pair .card {
+  padding: 7px 9px 7px;
+}
+
 .meter {
-  height: 6px;
-  margin-top: 4px;
-  border-radius: 3px;
-  background: var(--track);
+  height: 12px;
+  margin-top: 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--well);
   overflow: hidden;
 }
 
 .fill {
   width: 0;
   height: 100%;
-  border-radius: 3px;
   background: var(--accent);
   transition: width 0.3s ease;
 }
 
-/* Nearly full: switch to the warning colour. */
-.fill.hot {
+.detail {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 90% or more: the warning colour. */
+.card.hot .fill {
   background: var(--hot);
+}
+.card.hot .value {
+  color: var(--hot-ink);
+}
+
+@keyframes pop {
+  from { transform: rotate(-2deg) scale(0.92); opacity: 0; }
+  to { transform: rotate(-2deg); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .say.pop {
+    animation: none;
+  }
   .fill {
     transition: none;
   }

@@ -5,59 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>System Monitor</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="mascot.css" />
   </head>
   <body>
-    <header class="bar" data-tauri-drag-region>
-      <span class="title" data-tauri-drag-region>System Monitor</span>
-      <button id="pin" class="icon-btn" type="button" aria-pressed="false" title="항상 위에 고정">
+    <header class="top" data-tauri-drag-region>
+      <svg class="dots" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.5" /><circle cx="46" cy="12" r="3.5" /><circle cx="80" cy="12" r="3.5" /><circle cx="114" cy="12" r="3.5" /><circle cx="148" cy="12" r="3.5" /><circle cx="182" cy="12" r="3.5" /><circle cx="216" cy="12" r="3.5" /><circle cx="250" cy="12" r="3.5" /><circle cx="284" cy="12" r="3.5" />
+        <circle cx="12" cy="46" r="3.5" /><circle cx="46" cy="46" r="3.5" /><circle cx="80" cy="46" r="3.5" /><circle cx="114" cy="46" r="3.5" /><circle cx="148" cy="46" r="3.5" /><circle cx="182" cy="46" r="3.5" /><circle cx="216" cy="46" r="3.5" /><circle cx="250" cy="46" r="3.5" /><circle cx="284" cy="46" r="3.5" />
+      </svg>
+      <!-- 칩이, the mascot: drawn by mascot.js into this box. -->
+      <div class="mascot" id="mascot" aria-hidden="true"></div>
+      <div class="say" id="say" data-tauri-drag-region>
+        <span id="mood-text" data-tauri-drag-region>한가해요</span>
+      </div>
+      <button id="pin" class="round-btn" type="button" aria-pressed="false" title="항상 위에 고정">
         <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M10 1.5 14.5 6l-2 .6-2.4 2.4.3 3.2-1.2 1.2-2.8-2.8L2.5 14.5l-.9-.1-.1-.9 3.9-3.9-2.8-2.8 1.2-1.2 3.2.3 2.4-2.4z" />
+          <path d="M9.6 2.2l4.2 4.2-1.9.5-2.2 2.2.2 2.9-1 1-2.6-2.6-3.6 3.6-.7-.7 3.6-3.6L3 7.1l1-1 2.9.2 2.2-2.2z" />
         </svg>
       </button>
-      <button id="hide" class="icon-btn" type="button" title="숨기기">
+      <button id="hide" class="round-btn" type="button" title="숨기기">
         <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M3.5 3.5l9 9m0-9l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path class="x" d="M4.2 4.2l7.6 7.6m0-7.6l-7.6 7.6" />
         </svg>
       </button>
     </header>
 
     <main>
-      <section class="row cpu">
+      <section class="card cpu">
         <div class="line">
-          <span class="label">CPU</span>
-          <svg class="spark" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
-            <polyline id="cpu-spark" points="" />
-          </svg>
+          <span class="tag">CPU</span>
           <span class="value" id="cpu-value">—</span>
         </div>
+        <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+          <polygon id="cpu-area" points="" />
+          <polyline id="cpu-spark" points="" />
+        </svg>
         <div class="cores" id="cpu-cores" aria-label="코어별 사용률"></div>
       </section>
 
-      <section class="row gpu">
+      <section class="card gpu">
         <div class="line">
-          <span class="label">GPU</span>
-          <svg class="spark" id="gpu-spark-box" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
-            <polyline id="gpu-spark" points="" />
-          </svg>
+          <span class="tag">GPU</span>
           <span class="value" id="gpu-value">—</span>
         </div>
+        <svg class="spark" id="gpu-spark-box" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+          <polygon id="gpu-area" points="" />
+          <polyline id="gpu-spark" points="" />
+        </svg>
       </section>
 
-      <section class="row mem">
-        <div class="line">
-          <span class="label">MEM</span>
-          <span class="value wide" id="mem-value">—</span>
-        </div>
-        <div class="meter"><div class="fill" id="mem-fill"></div></div>
-      </section>
+      <div class="pair">
+        <section class="card mem">
+          <div class="line">
+            <span class="tag">MEM</span>
+            <span class="value" id="mem-percent">—</span>
+          </div>
+          <div class="meter"><div class="fill" id="mem-fill"></div></div>
+          <div class="detail" id="mem-value">—</div>
+        </section>
 
-      <section class="row disk">
-        <div class="line">
-          <span class="label">DISK</span>
-          <span class="value wide" id="disk-value">—</span>
-        </div>
-        <div class="meter"><div class="fill" id="disk-fill"></div></div>
-      </section>
+        <section class="card disk">
+          <div class="line">
+            <span class="tag">DISK</span>
+            <span class="value" id="disk-percent">—</span>
+          </div>
+          <div class="meter"><div class="fill" id="disk-fill"></div></div>
+          <div class="detail" id="disk-value">—</div>
+        </section>
+      </div>
     </main>
 
     <script type="module" src="main.js"></script>

@@ -13,7 +13,7 @@
         "label": "main",
         "title": "System Monitor",
         "width": 300,
-        "height": 240,
+        "height": 320,
         "resizable": false,
         "decorations": false,
         "transparent": false,
