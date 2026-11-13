@@ -1,6 +1,6 @@
 //! Gathers one `Snapshot` from the OS.
 
-use sysinfo::{Disks, System};
+use sysinfo::{DiskRefreshKind, Disks, System};
 
 use crate::gpu::GpuSampler;
 use crate::snapshot::{clamp_pct, mean, pick_system_disk, DiskInfo, Snapshot};
@@ -73,7 +73,9 @@ impl Collector {
         let Some(disks) = self.disks.as_mut() else {
             return (0, 0);
         };
-        disks.refresh(true);
+        // Sizes only: skipping the other per-volume properties keeps this
+        // cheap and avoids touching drives more than needed.
+        disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage());
         let infos: Vec<DiskInfo> = disks
             .iter()
             .map(|d| DiskInfo {

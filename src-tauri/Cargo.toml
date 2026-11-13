@@ -14,6 +14,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 sysinfo = { version = "0.40.3", default-features = false, features = ["system", "disk"] }
+tauri-plugin-single-instance = "2.5.5"
 
 [profile.release]
 opt-level = "s"
