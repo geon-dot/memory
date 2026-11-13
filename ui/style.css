@@ -152,10 +152,12 @@ main {
   visibility: hidden;
 }
 
-/* One thin bar per core; wraps onto more lines on machines with many cores. */
+/* One thin bar per core, all the same width; machines with many cores get a
+   second line, and anything beyond that is clipped rather than growing the
+   window. */
 .cores {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4px, 1fr));
   gap: 2px;
   margin-top: 5px;
   max-height: 22px;
@@ -163,8 +165,6 @@ main {
 }
 
 .core {
-  flex: 1 0 4px;
-  max-width: 24px;
   height: 10px;
   border-radius: 2px;
   background: var(--track);
