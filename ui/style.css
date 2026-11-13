@@ -1,0 +1,207 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f5f6f8;
+  --bar: #eceef2;
+  --text: #1c2030;
+  --muted: #6b7286;
+  --track: #dfe2e8;
+  --cpu: #1f9d63;
+  --gpu: #2f6fd6;
+  --mem: #b97a12;
+  --disk: #7a4fd0;
+  --hot: #d6453d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1e26;
+    --bar: #23262f;
+    --text: #e6e8ee;
+    --muted: #8b92a5;
+    --track: #30343f;
+    --cpu: #4cc38a;
+    --gpu: #6aa9ff;
+    --mem: #e0a84c;
+    --disk: #b58cf0;
+    --hot: #ff6b61;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* Title bar: the whole strip drags the window. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 6px 0 12px;
+  background: var(--bar);
+}
+
+.title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.icon-btn:hover {
+  background: var(--track);
+  color: var(--text);
+}
+
+.icon-btn[aria-pressed="true"] {
+  color: var(--gpu);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.row {
+  --accent: var(--muted);
+}
+.row.cpu { --accent: var(--cpu); }
+.row.gpu { --accent: var(--gpu); }
+.row.mem { --accent: var(--mem); }
+.row.disk { --accent: var(--disk); }
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+}
+
+.label {
+  width: 34px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.value {
+  width: 40px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.value.wide {
+  flex: 1;
+  width: auto;
+}
+
+.spark {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  border-bottom: 1px solid var(--track);
+}
+
+.spark polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark.off {
+  visibility: hidden;
+}
+
+/* One thin bar per core; wraps onto more lines on machines with many cores. */
+.cores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 5px;
+  max-height: 22px;
+  overflow: hidden;
+}
+
+.core {
+  flex: 1 0 4px;
+  max-width: 24px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.core i {
+  display: block;
+  width: 100%;
+  background: var(--accent);
+}
+
+.meter {
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.fill {
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* Nearly full: switch to the warning colour. */
+.fill.hot {
+  background: var(--hot);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
+  }
+}
