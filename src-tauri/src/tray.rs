@@ -58,7 +58,8 @@ pub fn update_title(app: &AppHandle, s: &Snapshot) {
     let _ = tray.set_tooltip(Some(&title));
 }
 
-fn show_window(app: &AppHandle) {
+/// Brings the widget window to the front, un-hiding it if needed.
+pub fn show_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.set_focus();

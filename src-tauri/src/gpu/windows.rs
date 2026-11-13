@@ -6,27 +6,39 @@ use std::collections::HashMap;
 use crate::snapshot::clamp_pct;
 
 /// Reduces per-process `GPU Engine` counter instances to one utilization
-/// figure the way Task Manager does: sum the instances of each engine type
-/// (`3D`, `VideoDecode`, ...) and report the busiest type.
+/// figure the way Task Manager does: for each adapter, sum the instances of
+/// each engine type (`3D`, `VideoDecode`, ...), then report the busiest
+/// adapter-and-type pair. Adapters are never added together, so a laptop with
+/// an integrated and a discrete GPU shows the busier of the two.
 ///
-/// Instance names look like `pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3D`.
-/// Names without an `engtype_` part are ignored; `None` means nothing usable
-/// was reported.
+/// Instance names look like `pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3D`,
+/// where `luid_..._phys` identifies the adapter. Names without an `engtype_`
+/// part are ignored; `None` means nothing usable was reported.
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))] // used by PdhGpu
 pub fn aggregate_engines(samples: &[(String, f64)]) -> Option<f32> {
-    let mut per_type: HashMap<&str, f64> = HashMap::new();
+    let mut per_engine: HashMap<(&str, &str), f64> = HashMap::new();
     for (name, value) in samples {
-        if let Some((_, engine_type)) = name.rsplit_once("engtype_") {
-            if value.is_finite() {
-                *per_type.entry(engine_type).or_insert(0.0) += value;
-            }
+        let Some((rest, engine_type)) = name.rsplit_once("engtype_") else {
+            continue;
+        };
+        if !value.is_finite() {
+            continue;
         }
+        *per_engine.entry((adapter_of(rest), engine_type)).or_insert(0.0) += value;
     }
-    per_type
+    per_engine
         .values()
         .copied()
         .reduce(f64::max)
         .map(|v| clamp_pct(v as f32))
+}
+
+/// The adapter id inside an instance name: the text between `luid_` and
+/// `_phys`. Names without one all count as a single unnamed adapter.
+fn adapter_of(name: &str) -> &str {
+    name.split_once("luid_")
+        .and_then(|(_, after)| after.split_once("_phys"))
+        .map_or("", |(luid, _)| luid)
 }
 
 #[cfg(target_os = "windows")]
@@ -166,6 +178,17 @@ mod tests {
             ("pid_1_luid_0x0_0x1_phys_0_eng_1_engtype_VideoDecode".to_string(), 30.0),
         ];
         assert_eq!(aggregate_engines(&s), Some(35.5));
+    }
+
+    #[test]
+    fn adapters_are_not_added_together() {
+        // Integrated and discrete GPU both busy: report the busier adapter,
+        // not their sum.
+        let s = vec![
+            ("pid_1_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 30.0),
+            ("pid_2_luid_0x0_0xB_phys_0_eng_0_engtype_3D".to_string(), 40.0),
+        ];
+        assert_eq!(aggregate_engines(&s), Some(40.0));
     }
 
     #[test]

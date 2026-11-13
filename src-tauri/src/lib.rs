@@ -32,7 +32,12 @@ fn spawn_sampler(app: tauri::AppHandle) {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        // Must be the first plugin. Starting the app a second time brings the
+        // running widget forward instead of adding another tray icon.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_window(app);
+        }))
         .invoke_handler(tauri::generate_handler![set_pinned])
         // Closing the widget only hides it; the app lives on in the tray and
         // quits from the tray menu.
@@ -51,6 +56,15 @@ pub fn run() {
             spawn_sampler(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running System Monitor");
+        .build(tauri::generate_context!())
+        .expect("error while building System Monitor");
+
+    app.run(|_app, _event| {
+        // Opening the app again from Finder or Spotlight while it is running
+        // re-shows a hidden widget.
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { .. } = _event {
+            tray::show_window(_app);
+        }
+    });
 }
