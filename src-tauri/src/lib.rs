@@ -1,10 +1,11 @@
 mod collector;
 mod gpu;
 mod snapshot;
+mod tray;
 
 use std::time::Duration;
 
-use tauri::Emitter;
+use tauri::{Emitter, WindowEvent};
 
 use collector::Collector;
 
@@ -25,6 +26,7 @@ fn spawn_sampler(app: tauri::AppHandle) {
             let snapshot = collector.sample();
             // Emitting fails only while the app is shutting down.
             let _ = app.emit("snapshot", &snapshot);
+            tray::update_title(&app, &snapshot);
         }
     });
 }
@@ -32,7 +34,20 @@ fn spawn_sampler(app: tauri::AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![set_pinned])
+        // Closing the widget only hides it; the app lives on in the tray and
+        // quits from the tray menu.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .setup(|app| {
+            // Menu bar only: no Dock icon.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            tray::build(app.handle())?;
             spawn_sampler(app.handle().clone());
             Ok(())
         })
