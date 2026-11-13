@@ -13,7 +13,7 @@ import { DEFAULT_MASCOT, mascotOf, picturesOf } from './mascots.js';
 const CHIP_ART = `
   <svg class="chip" viewBox="0 0 64 64" aria-hidden="true">
     <ellipse class="ground" cx="32" cy="59.5" rx="16" ry="2.4" />
-    <g class="whole">
+    <g class="jump"><g class="whole">
       <g class="steam">
         <path d="M24 8.5q-3-2.8 0-5.6" />
         <path d="M40 8.5q3-2.8 0-5.6" />
@@ -48,19 +48,21 @@ const CHIP_ART = `
       <ellipse class="mouth m-busy" cx="32" cy="39.6" rx="1.9" ry="2.3" />
       <path class="mouth m-hot" d="M26.8 40.4q2.6-2.8 5.2 0t5.2 0" />
       <path class="sweat" d="M54.5 9.5q3.4 4.4 0 6.4q-3.4-2 0-6.4z" />
-    </g>
+    </g></g>
   </svg>
 `;
 
 // A picture mascot: the three pictures stacked in one box, of which
 // mascot.css shows the one for the mood. All three are in the page from the
-// start, so a change of mood has nothing to load.
+// start, so a change of mood has nothing to load. Like 칩이, the figure is a
+// `.whole` (what breathes, bobs and shakes) inside a `.jump` (what hops when
+// the mood changes).
 function pictureArt(pictures) {
   const image = (mood) =>
     `<image class="p-${mood}" href="${pictures[mood]}" width="64" height="64" />`;
   return `
   <svg class="pic" viewBox="0 0 64 64" aria-hidden="true">
-    <g class="whole">${image('calm')}${image('busy')}${image('hot')}</g>
+    <g class="jump"><g class="whole">${image('calm')}${image('busy')}${image('hot')}</g></g>
   </svg>
 `;
 }
@@ -123,16 +125,28 @@ export function mountMascot(host, { idleMotion = true, name = DEFAULT_MASCOT } =
     }
   }
 
+  // Replays the hop, when there is someone to see it.
+  function hop() {
+    host.classList.remove('changed');
+    if (document.hidden) return;
+    void host.offsetWidth;
+    host.classList.add('changed');
+  }
+
   document.addEventListener('visibilitychange', syncMotion);
   reducedMotion.addEventListener('change', syncMotion);
   draw(name);
 
   return {
     setMood(mood) {
+      if (mood === host.dataset.mood) return;
       host.dataset.mood = mood;
+      hop();
     },
     setMascot(wanted) {
-      if (mascotOf(wanted) !== host.dataset.mascot) draw(wanted);
+      if (mascotOf(wanted) === host.dataset.mascot) return;
+      draw(wanted);
+      hop();
     },
   };
 }
