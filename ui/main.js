@@ -6,6 +6,8 @@ import {
   usageLabel,
   recentAverage,
   moodOf,
+  holdMood,
+  coreLayout,
 } from './format.js';
 import { mountMascot } from './mascot.js';
 
@@ -18,6 +20,9 @@ const HOT_PERCENT = 90;
 // for it. How often readings arrive is the app's side: SAMPLE_INTERVAL in
 // lib.rs.
 const IDLE_MOTION = true;
+// A mood that has just appeared stays at least this long, so readings near
+// a limit do not swap the face and the line every second.
+const MOOD_HOLD_MS = 5000;
 // What 칩이 says in each mood.
 const MOOD_TEXT = { calm: '한가해요', busy: '바빠요!', hot: '앗, 뜨거워!' };
 
@@ -63,6 +68,10 @@ function renderSpark(lineEl, areaEl, history) {
 function renderCores(cores) {
   // Rebuild only when the core count changes; otherwise just resize the bars.
   if (el.cpuCores.childElementCount !== cores.length) {
+    const { columns, rows, gapX, gapY } = coreLayout(cores.length);
+    el.cpuCores.style.setProperty('--columns', columns);
+    el.cpuCores.style.gap = `${gapY}px ${gapX}px`;
+    el.cpuCores.classList.toggle('rows', rows > 1);
     el.cpuCores.replaceChildren(
       ...cores.map(() => {
         const bar = document.createElement('div');
@@ -87,13 +96,15 @@ function renderMeter(percentEl, valueEl, fillEl, used, total) {
 }
 
 const mascot = mountMascot($('mascot'), { idleMotion: IDLE_MOTION });
-let shownMood = 'calm';
+// The mood on screen and when it appeared; it starts as the page is drawn.
+let shown = { mood: 'calm', since: -Infinity };
 
-function renderMood(mood) {
-  if (mood === shownMood) return;
-  shownMood = mood;
-  mascot.setMood(mood);
-  el.moodText.textContent = MOOD_TEXT[mood];
+function renderMood(wanted) {
+  const next = holdMood(shown, wanted, performance.now(), MOOD_HOLD_MS);
+  if (next === shown) return;
+  shown = next;
+  mascot.setMood(shown.mood);
+  el.moodText.textContent = MOOD_TEXT[shown.mood];
   // Replay the bubble's little pop for the new line, when there is someone
   // to see it.
   el.say.classList.remove('pop');

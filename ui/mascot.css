@@ -96,7 +96,7 @@
   animation: steam 1.6s steps(4) infinite;
 }
 
-/* A blink: main.js adds the class for one short cel every few seconds. */
+/* A blink: mascot.js adds the class for one short cel every few seconds. */
 .chip .open {
   transform-origin: 50% 50%;
 }

@@ -34,9 +34,11 @@ Mac 메뉴 막대 / Windows 트레이에 상주하면서 CPU, GPU, 메모리, �
 | 바쁨 | 최근 5초 CPU 평균 45% 이상, 또는 GPU 60% 이상 | 까딱거리며 땀방울, "바빠요!" |
 | 뜨거움 | 최근 5초 CPU 평균 85% 이상, 또는 메모리 90% 이상 | 분홍색 몸에 김이 나고 흔들림, "앗, 뜨거워!" |
 
+한 번 바뀐 상태는 적어도 5초 동안 유지됩니다. 측정값이 경계 근처에서 오르내려도 표정과 말이 매초 바뀌지 않습니다.
+
 ## 기능
 
-- **CPU**: 전체 사용률, 최근 60초 그래프, 코어별 막대
+- **CPU**: 전체 사용률, 최근 60초 그래프, 코어별 막대 (코어가 33개 이상이면 같은 높이 안에서 두 줄 이상으로 나눠 그려서 창 크기는 그대로)
 - **GPU**: 사용률과 최근 60초 그래프. 읽을 수 없는 기기에서는 `N/A`
 - **MEM / DISK**: 사용률(%), 막대, 사용량
 - 어느 항목이든 90% 이상이면 숫자가 경고색 (MEM / DISK는 막대도)
@@ -184,8 +186,8 @@ scripts/measure-cpu.sh --app "src-tauri/target/release/bundle/macos/System Monit
 | `src-tauri/src/tray.rs` | 트레이 아이콘, 메뉴, 요약 표시 |
 | `src-tauri/src/widget.rs` | 위젯 창 열기·닫기(닫으면 해제), 위치·📌 기억 |
 | `src-tauri/src/lib.rs` | 앱 조립, 1초 주기 샘플러 스레드 |
-| `ui/` | 위젯 화면 (프레임워크 없는 HTML/CSS/JS). 칩이는 `index.html` 안의 SVG |
-| `ui/format.js` | 표시용 순수 계산 (단위, 그래프 좌표, 칩이 상태 판정) |
+| `ui/` | 위젯 화면 (프레임워크 없는 HTML/CSS/JS). 칩이는 `ui/mascot.js`가 그리는 SVG, 움직임은 `ui/mascot.css` |
+| `ui/format.js` | 표시용 순수 계산 (단위, 그래프 좌표, 코어 막대 배치, 칩이 상태 판정과 유지) |
 | `ui/demo.js` | 브라우저에서 화면만 볼 때 쓰는 가짜 측정값 (앱에서는 쓰지 않음) |
 | `src-tauri/icons/src/` | 앱·트레이 아이콘 원본 SVG (직접 그린 것) |
 | `scripts/build-icons.sh` | SVG에서 아이콘 파일 만들기 (macOS) |
