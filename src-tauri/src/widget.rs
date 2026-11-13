@@ -10,8 +10,10 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
-use tauri::{AppHandle, LogicalPosition, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalPosition, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+
+use crate::mascot::Mascot;
 
 pub const WINDOW_LABEL: &str = "main";
 
@@ -26,20 +28,39 @@ pub struct WidgetState {
     /// tauri.conf.json).
     pinned: Mutex<bool>,
     pin_file: Option<PathBuf>,
+    /// The mascot chosen in the tray menu. Kept the same way, in
+    /// `mascot_file`, and handed to each new widget.
+    mascot: Mutex<Mascot>,
+    mascot_file: Option<PathBuf>,
 }
 
 impl WidgetState {
     pub fn load(app: &AppHandle) -> Self {
-        let pin_file = app.path().app_config_dir().ok().map(|d| d.join("pinned"));
+        let config_dir = app.path().app_config_dir().ok();
+        let pin_file = config_dir.as_ref().map(|d| d.join("pinned"));
         let pinned = pin_file
             .as_ref()
             .and_then(|f| std::fs::read_to_string(f).ok())
             .is_some_and(|t| parse_pinned(&t));
+        let mascot_file = config_dir.map(|d| d.join("mascot"));
+        let saved = mascot_file
+            .as_ref()
+            .and_then(|f| std::fs::read_to_string(f).ok());
         WidgetState {
             position: Mutex::new(None),
             pinned: Mutex::new(pinned),
             pin_file,
+            mascot: Mutex::new(Mascot::from_saved(saved.as_deref())),
+            mascot_file,
         }
+    }
+}
+
+/// Saves a preference. If it cannot be saved, it lasts this session only.
+fn save(file: &Option<PathBuf>, text: &str) {
+    if let Some(file) = file {
+        let _ = std::fs::create_dir_all(file.parent().unwrap_or(file));
+        let _ = std::fs::write(file, text);
     }
 }
 
@@ -66,13 +87,29 @@ pub fn set_pinned(window: &WebviewWindow, pinned: bool) -> tauri::Result<()> {
     window.set_always_on_top(pinned)?;
     if let Some(state) = window.try_state::<WidgetState>() {
         *state.pinned.lock().unwrap() = pinned;
-        if let Some(file) = &state.pin_file {
-            // A preference only: if it cannot be saved, it lasts this session.
-            let _ = std::fs::create_dir_all(file.parent().unwrap_or(file));
-            let _ = std::fs::write(file, pinned_text(pinned));
-        }
+        save(&state.pin_file, pinned_text(pinned));
     }
     Ok(())
+}
+
+/// The mascot the widget shows.
+pub fn mascot(app: &AppHandle) -> Mascot {
+    app.try_state::<WidgetState>()
+        .map(|s| *s.mascot.lock().unwrap())
+        .unwrap_or_default()
+}
+
+/// Chooses the mascot: an open widget changes at once, and every widget
+/// opened later (this run or the next) starts with it.
+pub fn set_mascot(app: &AppHandle, mascot: Mascot) {
+    if let Some(state) = app.try_state::<WidgetState>() {
+        *state.mascot.lock().unwrap() = mascot;
+        save(&state.mascot_file, mascot.id());
+    }
+    crate::tray::show_mascot(app, mascot);
+    // Reaches the widget only if one is open; a closed one has no web view.
+    let _ = app.emit("mascot", mascot.id());
+    diag!("mascot: {}", mascot.id());
 }
 
 /// Whether the app should keep running when it is asked to exit with `code`.
@@ -91,12 +128,14 @@ pub enum Action {
     Toggle,
     /// Tell the user the app is already running.
     Notice,
+    /// Choose a mascot, as the tray menu does.
+    Mascot(Mascot),
 }
 
 /// Starting the app again does not start a second copy; the running one says
-/// it is already running. With diagnostics on, `--hide`, `--toggle` and
-/// `--show` instead drive the widget the way the tray does, so the memory of
-/// each state can be measured without clicking.
+/// it is already running. With diagnostics on, `--hide`, `--toggle`,
+/// `--show` and `--mascot=<id>` instead drive the widget the way the tray
+/// does, so each state can be measured and checked without clicking.
 pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
     if !diagnostics {
         return Action::Notice;
@@ -107,7 +146,10 @@ pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
             "--hide" => Some(Action::Hide),
             "--toggle" => Some(Action::Toggle),
             "--show" => Some(Action::Show),
-            _ => None,
+            other => other
+                .strip_prefix("--mascot=")
+                .and_then(Mascot::from_id)
+                .map(Action::Mascot),
         })
         .unwrap_or(Action::Notice)
 }
@@ -144,6 +186,7 @@ pub fn run_from_any_thread(app: &AppHandle, action: Action) {
         Action::Hide => hide(&handle),
         Action::Toggle => toggle(&handle),
         Action::Notice => notice(&handle),
+        Action::Mascot(mascot) => set_mascot(&handle, mascot),
     });
 }
 
@@ -253,6 +296,23 @@ mod tests {
         assert_eq!(second_launch_action(&show, true), Action::Show);
         let other = args(&["system-monitor", "--whatever"]);
         assert_eq!(second_launch_action(&other, true), Action::Notice);
+    }
+
+    #[test]
+    fn mascot_flag_chooses_a_mascot_only_with_diagnostics_on() {
+        let usagi = args(&["system-monitor", "--mascot=usagi"]);
+        assert_eq!(second_launch_action(&usagi, false), Action::Notice);
+        assert_eq!(
+            second_launch_action(&usagi, true),
+            Action::Mascot(Mascot::Usagi)
+        );
+        let chip = args(&["system-monitor", "--mascot=chip"]);
+        assert_eq!(
+            second_launch_action(&chip, true),
+            Action::Mascot(Mascot::Chip)
+        );
+        let nobody = args(&["system-monitor", "--mascot=nobody"]);
+        assert_eq!(second_launch_action(&nobody, true), Action::Notice);
     }
 
     #[test]

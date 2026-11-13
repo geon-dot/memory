@@ -10,7 +10,6 @@ import {
   coreLayout,
 } from './format.js';
 import { mountMascot } from './mascot.js';
-import { mascotOf } from './mascots.js';
 
 // Matches the sparkline SVG viewBox in index.html.
 const SPARK_W = 100;
@@ -96,10 +95,25 @@ function renderMeter(percentEl, valueEl, fillEl, used, total) {
   return pct;
 }
 
-// Which mascot: opened in a browser, `?mascot=<name>` picks one.
+const tauri = window.__TAURI__;
+
+// Which mascot: the app keeps the choice made in its tray menu (this web
+// view has no storage that outlives it). Opened in a browser,
+// `?mascot=<name>` picks one. No answer, or an unknown name, gives the
+// default one.
+async function chosenMascot() {
+  if (!tauri) return new URLSearchParams(location.search).get('mascot');
+  try {
+    return await tauri.core.invoke('mascot');
+  } catch {
+    return null;
+  }
+}
+
 const mascot = mountMascot($('mascot'), {
   idleMotion: IDLE_MOTION,
-  name: mascotOf(new URLSearchParams(location.search).get('mascot')),
+  name: await chosenMascot(),
+  report: (line) => tauri?.core.invoke('diag', { line }),
 });
 // The mood on screen and when it appeared; it starts as the page is drawn.
 let shown = { mood: 'calm', since: -Infinity };
@@ -140,8 +154,6 @@ function render(s) {
   renderMood(moodOf({ cpu: recentAverage(cpuHistory), gpu: s.gpu, memPercent }));
 }
 
-const tauri = window.__TAURI__;
-
 async function setPinned(pinned) {
   el.pin.setAttribute('aria-pressed', String(pinned));
   if (tauri) await tauri.core.invoke('set_pinned', { pinned });
@@ -159,6 +171,8 @@ el.hide.addEventListener('click', () => {
 
 if (tauri) {
   tauri.event.listen('snapshot', (event) => render(event.payload));
+  // Chosen in the tray menu while this widget is open.
+  tauri.event.listen('mascot', (event) => mascot.setMascot(event.payload));
   // The app keeps the pin (this web view has no storage that outlives it)
   // and has already applied it to the window; only the button needs it.
   tauri.core.invoke('pinned').then((pinned) => {

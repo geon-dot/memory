@@ -78,9 +78,13 @@ const BLINK_SHUT_MS = 130;
  * where a mood is 'calm', 'busy' or 'hot' and a mascot is one of MASCOTS.
  * With `idleMotion` off the mascot still changes face with the mood but
  * holds still. A picture mascot whose pictures cannot be read is replaced
- * by 칩이.
+ * by 칩이. `report` is given a line about what is on show whenever that
+ * changes (the app prints it in its diagnostics).
  */
-export function mountMascot(host, { idleMotion = true, name = DEFAULT_MASCOT } = {}) {
+export function mountMascot(
+  host,
+  { idleMotion = true, name = DEFAULT_MASCOT, report = () => {} } = {},
+) {
   host.dataset.mood = 'calm';
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let blinkTimer = 0;
@@ -107,18 +111,30 @@ export function mountMascot(host, { idleMotion = true, name = DEFAULT_MASCOT } =
     if (!still) blinkLater(chip);
   }
 
+  // Says what is on show: mascot, mood, the picture (or that it is drawn)
+  // and the name of the movement.
+  function tell() {
+    const { mascot, mood } = host.dataset;
+    const picture = host.querySelector(`.p-${mood}`);
+    const movement = getComputedStyle(host.querySelector('.whole')).animationName;
+    report(`${mascot} ${mood}: ${picture ? picture.getAttribute('href') : 'drawn'}, ${movement}`);
+  }
+
   function draw(wanted) {
     const shown = mascotOf(wanted);
     const pictures = picturesOf(shown);
     host.dataset.mascot = shown;
     host.innerHTML = pictures ? pictureArt(pictures) : CHIP_ART;
     syncMotion();
+    tell();
     if (!pictures) return;
     // If any of the pictures cannot be read, 칩이 stands in (unless another
     // mascot has been chosen by then).
     for (const src of Object.values(pictures)) {
       const probe = new Image();
+      probe.onload = () => report(`read ${src} ${probe.naturalWidth}x${probe.naturalHeight}`);
       probe.onerror = () => {
+        report(`could not read ${src}`);
         if (host.dataset.mascot === shown) draw('chip');
       };
       probe.src = src;
@@ -142,6 +158,7 @@ export function mountMascot(host, { idleMotion = true, name = DEFAULT_MASCOT } =
       if (mood === host.dataset.mood) return;
       host.dataset.mood = mood;
       hop();
+      tell();
     },
     setMascot(wanted) {
       if (mascotOf(wanted) === host.dataset.mascot) return;
