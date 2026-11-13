@@ -116,14 +116,16 @@ pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
 /// times shows one dialog, not a stack of them.
 static NOTICE_OPEN: AtomicBool = AtomicBool::new(false);
 
-/// Shows the "already running" dialog. Does not block the caller.
+/// Opens the widget and shows the "already running" dialog. Does not block
+/// the caller.
 pub fn notice(app: &AppHandle) {
+    show(app);
     if NOTICE_OPEN.swap(true, Ordering::SeqCst) {
         return;
     }
     diag!("notice: already running");
     app.dialog()
-        .message("System Monitor가 이미 실행 중입니다.\n메뉴 막대(트레이)의 아이콘을 눌러 위젯을 여세요.")
+        .message("System Monitor가 이미 실행 중입니다.\n위젯을 열었습니다. 메뉴 막대(트레이)의 아이콘으로 여닫을 수 있습니다.")
         .title("System Monitor")
         .kind(MessageDialogKind::Info)
         .show(|ok| {
