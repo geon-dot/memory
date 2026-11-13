@@ -167,8 +167,8 @@ pub fn notice(app: &AppHandle) {
     }
     diag!("notice: already running");
     app.dialog()
-        .message("System Monitor가 이미 실행 중입니다.\n위젯을 열었습니다. 메뉴 막대(트레이)의 아이콘으로 여닫을 수 있습니다.")
-        .title("System Monitor")
+        .message("먼작귀모니터링이 이미 실행 중입니다.\n위젯을 열었습니다. 메뉴 막대(트레이)의 아이콘으로 여닫을 수 있습니다.")
+        .title("먼작귀모니터링")
         .kind(MessageDialogKind::Info)
         .show(|ok| {
             diag!("notice: closed ({ok})");
@@ -205,7 +205,7 @@ pub fn show(app: &AppHandle) {
         None => match create(app) {
             Ok(window) => window,
             Err(e) => {
-                eprintln!("System Monitor: could not open the widget: {e}");
+                eprintln!("먼작귀모니터링: could not open the widget: {e}");
                 return;
             }
         },

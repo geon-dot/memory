@@ -40,7 +40,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     app.manage(MascotItems(mascot_items));
 
     let builder = TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("System Monitor")
+        .tooltip("먼작귀모니터링")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {

@@ -1,4 +1,4 @@
-# System Monitor
+# 먼작귀모니터링
 
 Mac 메뉴 막대 / Windows 트레이에 상주하면서 CPU, GPU, 메모리, 디스크 상태를 1초마다 보여주는 작은 위젯입니다.
 
@@ -75,7 +75,7 @@ npm test
 npm run tauri build
 ```
 
-- macOS: `src-tauri/target/release/bundle/macos/System Monitor.app` 과 `.dmg`
+- macOS: `src-tauri/target/release/bundle/macos/먼작귀모니터링.app` 과 `.dmg`
 - Windows: `src-tauri\target\release\bundle\` 아래 `.msi` / `.exe` 설치 파일
 
 ### Windows에서 빌드하기
@@ -107,7 +107,7 @@ Windows 빌드는 Windows PC에서 해야 합니다.
 ### 재는 법 (macOS)
 
 ```sh
-scripts/measure-memory.sh --app "src-tauri/target/release/bundle/macos/System Monitor.app"
+scripts/measure-memory.sh --app "src-tauri/target/release/bundle/macos/먼작귀모니터링.app"
 scripts/measure-memory.sh --pid <pid> --settle 60   # 60초 기다린 뒤 측정
 ```
 
@@ -156,7 +156,7 @@ footprint 합계(앱 본체 + WebKit 보조 프로세스), 여러 번 잰 범위
 ### CPU
 
 ```sh
-scripts/measure-cpu.sh --app "src-tauri/target/release/bundle/macos/System Monitor.app" --seconds 75
+scripts/measure-cpu.sh --app "src-tauri/target/release/bundle/macos/먼작귀모니터링.app" --seconds 75
 ```
 
 앱 본체와 WebKit 보조 프로세스의 누적 CPU 시간이 그 시간 동안 얼마나 늘었는지를 경과 시간으로 나눈 평균입니다

@@ -126,7 +126,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building System Monitor");
+        .expect("error while building 먼작귀모니터링");
 
     app.run(|_app, event| match event {
         // The last window closing asks to exit; stay in the tray instead.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Measures how much memory a running System Monitor uses on macOS: the app
+# Measures how much memory a running 먼작귀모니터링 uses on macOS: the app
 # process itself plus the WebKit helper processes that draw its widget.
 #
 #   scripts/measure-memory.sh (--pid <pid> | --app <path/to/X.app>) [--settle <seconds>] [--label <text>]
@@ -28,7 +28,7 @@
 #   asked for it, which is also what Activity Monitor and the TCC privacy
 #   prompts attribute the helper to. We read it with
 #   responsibility_get_pid_responsible_for_pid() from libSystem and keep the
-#   com.apple.WebKit.* processes whose responsible PID is System Monitor's.
+#   com.apple.WebKit.* processes whose responsible PID is the app's.
 #
 # Widget shown or hidden
 #   From CGWindowListCopyWindowInfo, which needs no screen-recording or
@@ -161,7 +161,7 @@ rss_mib() {
 windows=$(awk '/^windows / { print $2 }' <<<"$probe_out")
 if [[ "${windows:-0}" -gt 0 ]]; then state="shown"; else state="hidden"; fi
 
-echo "System Monitor pid $pid  widget: $state${label:+  ($label)}"
+echo "먼작귀모니터링 pid $pid  widget: $state${label:+  ($label)}"
 printf '%-8s %-28s %12s %10s\n' PID PROCESS "FOOTPRINT" "RSS"
 
 total_fp=0

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Measures how much CPU a running System Monitor uses on macOS: the app
+# Measures how much CPU a running 먼작귀모니터링 uses on macOS: the app
 # process plus the WebKit helper processes that draw its widget, averaged
 # over a stretch of time.
 #
