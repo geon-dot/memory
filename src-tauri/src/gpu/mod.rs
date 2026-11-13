@@ -2,14 +2,21 @@
 
 #[cfg(target_os = "macos")]
 mod macos;
+mod windows;
 
 /// Reads GPU utilization. Never panics: when the OS offers no reading,
 /// `sample` returns `None`.
-pub struct GpuSampler {}
+pub struct GpuSampler {
+    #[cfg(target_os = "windows")]
+    pdh: Option<windows::PdhGpu>,
+}
 
 impl GpuSampler {
     pub fn new() -> Self {
-        GpuSampler {}
+        GpuSampler {
+            #[cfg(target_os = "windows")]
+            pdh: windows::PdhGpu::new(),
+        }
     }
 
     /// Current GPU utilization, 0.0..=100.0, or `None` when unavailable.
@@ -18,7 +25,11 @@ impl GpuSampler {
         {
             macos::sample()
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            self.pdh.as_mut().and_then(|p| p.sample())
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             None
         }
