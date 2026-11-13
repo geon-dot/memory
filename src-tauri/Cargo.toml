@@ -1,0 +1,28 @@
+[package]
+name = "system-monitor"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "system_monitor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+sysinfo = "0.40.3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10.1"
+io-kit-sys = "0.5.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_System_Performance", "Win32_Foundation"] }
