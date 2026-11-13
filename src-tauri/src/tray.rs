@@ -19,7 +19,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, MENU_QUIT, "종료", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
 
-    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+    let builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("System Monitor")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -38,9 +38,15 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
                 widget::toggle(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
-    }
+    // The mascot's face, drawn for the tray (sources in icons/src). The menu
+    // bar gets a one-colour template image, which macOS tints for a light or
+    // a dark bar; other trays get the colour drawing.
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .icon(tauri::include_image!("icons/tray/template.png"))
+        .icon_as_template(true);
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.icon(tauri::include_image!("icons/tray/color.png"));
     builder.build(app)?;
     Ok(())
 }
