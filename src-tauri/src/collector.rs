@@ -69,6 +69,34 @@ impl Collector {
         }
     }
 
+    /// Just what the tray shows (CPU total and memory), for while the widget
+    /// is closed: no per-core list, GPU or disk reading.
+    pub fn sample_tray(&mut self) -> Snapshot {
+        let (cpu_total, mem_used, mem_total) = match self.system.as_mut() {
+            Some(sys) => {
+                sys.refresh_cpu_usage();
+                sys.refresh_memory();
+                let cpus = sys.cpus();
+                let sum: f32 = cpus.iter().map(|c| clamp_pct(c.usage())).sum();
+                let cpu = if cpus.is_empty() { 0.0 } else { sum / cpus.len() as f32 };
+                let total = sys.total_memory();
+                (cpu, sys.used_memory().min(total), total)
+            }
+            None => (0.0, 0, 0),
+        };
+        // The disk reading is stale by now; read it on the next full sample.
+        self.samples = 0;
+        Snapshot {
+            cpu_total,
+            cpu_cores: Vec::new(),
+            gpu: None,
+            mem_used,
+            mem_total,
+            disk_used: 0,
+            disk_total: 0,
+        }
+    }
+
     fn read_disk(&mut self) -> (u64, u64) {
         let Some(disks) = self.disks.as_mut() else {
             return (0, 0);
@@ -112,5 +140,29 @@ mod tests {
         assert!(s.cpu_cores.iter().all(|v| (0.0..=100.0).contains(v)));
         assert!(s.mem_total > 0 && s.mem_used <= s.mem_total);
         assert!(s.disk_total > 0 && s.disk_used <= s.disk_total);
+    }
+
+    #[test]
+    fn tray_sample_reads_only_what_the_tray_shows() {
+        let mut c = Collector::new();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        let s = c.sample_tray();
+        assert!((0.0..=100.0).contains(&s.cpu_total));
+        assert!(s.mem_total > 0 && s.mem_used <= s.mem_total);
+        assert!(s.cpu_cores.is_empty());
+        assert_eq!(s.gpu, None);
+        assert_eq!((s.disk_used, s.disk_total), (0, 0));
+    }
+
+    #[test]
+    fn full_sample_after_tray_samples_reads_the_disk() {
+        let mut c = Collector::new();
+        // Enough tray samples to step past the disk refresh interval.
+        for _ in 0..(DISK_REFRESH_EVERY + 2) {
+            c.sample_tray();
+        }
+        let s = c.sample();
+        assert!(s.disk_total > 0);
+        assert!(!s.cpu_cores.is_empty());
     }
 }
