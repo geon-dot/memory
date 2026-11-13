@@ -71,13 +71,14 @@ fn spawn_sampler(app: tauri::AppHandle) {
 
 pub fn run() {
     let app = tauri::Builder::default()
-        // Must be the first plugin. Starting the app a second time brings the
-        // running widget forward instead of adding another tray icon.
+        // Must be the first plugin. Starting the app a second time adds no
+        // second tray icon; the running app says it is already running.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             let action = widget::second_launch_action(&args, diag_enabled());
             diag!("second launch: {action:?}");
             widget::run_from_any_thread(app, action);
         }))
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![set_pinned, pinned])
         // Closing the widget (✕, or the system closing the window) releases
         // its window and web view; the app lives on in the tray and quits from
@@ -117,9 +118,9 @@ pub fn run() {
             api.prevent_exit();
         }
         // Opening the app again from Finder or Spotlight while it is running
-        // opens the widget.
+        // arrives here on macOS, not as a second launch.
         #[cfg(target_os = "macos")]
-        tauri::RunEvent::Reopen { .. } => widget::show(_app),
+        tauri::RunEvent::Reopen { .. } => widget::notice(_app),
         _ => {}
     });
 }
