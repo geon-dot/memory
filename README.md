@@ -71,8 +71,10 @@ Rust나 Node를 설치할 필요가 없습니다. [Releases](../../releases/late
 
 | OS | 받을 파일 |
 |----|-----------|
-| macOS (Apple Silicon, Intel 공용) | `먼작귀모니터링_<버전>_universal.dmg` |
-| Windows 10 / 11 | `먼작귀모니터링_<버전>_x64-setup.exe` |
+| macOS (Apple Silicon, Intel 공용) | `_<버전>_universal.dmg` |
+| Windows 10 / 11 | `_<버전>_x64-setup.exe` (또는 `_<버전>_x64_ko-KR.msi`) |
+
+GitHub이 파일 이름에서 한글을 빼서 이름이 밑줄로 시작합니다. 설치되는 앱 이름은 먼작귀모니터링입니다.
 
 서명(유료 인증서)이 없는 앱이라 처음 열 때 한 번 경고가 뜹니다.
 
@@ -81,7 +83,7 @@ Rust나 Node를 설치할 필요가 없습니다. [Releases](../../releases/late
   그래도 열리지 않으면 터미널에서 `xattr -dr com.apple.quarantine /Applications/먼작귀모니터링.app` 을 한 번 실행합니다.
 - **Windows**: 설치 파일을 실행했을 때 "Windows의 PC 보호"가 뜨면 **추가 정보 → 실행**을 누릅니다.
 
-> Windows용 파일은 GitHub의 Windows 기기에서 자동으로 만든 것이고, 실제 Windows PC에서 실행해 확인한 적은 없습니다.
+> Windows용 파일은 GitHub의 Windows 기기에서 자동으로 빌드된 것입니다. 빌드와 테스트는 통과했지만, 실제 Windows PC에서 실행해 확인한 적은 없습니다.
 
 새 버전은 `v0.2.0` 같은 태그를 올리면 `.github/workflows/release.yml`이 자동으로 빌드해 Releases에 올립니다.
 
