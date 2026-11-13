@@ -13,7 +13,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
-sysinfo = "0.40.3"
+sysinfo = { version = "0.40.3", default-features = false, features = ["system", "disk"] }
 
 [profile.release]
 opt-level = "s"

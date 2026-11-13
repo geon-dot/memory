@@ -12,6 +12,7 @@ use crate::snapshot::clamp_pct;
 /// Instance names look like `pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3D`.
 /// Names without an `engtype_` part are ignored; `None` means nothing usable
 /// was reported.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))] // used by PdhGpu
 pub fn aggregate_engines(samples: &[(String, f64)]) -> Option<f32> {
     let mut per_type: HashMap<&str, f64> = HashMap::new();
     for (name, value) in samples {
