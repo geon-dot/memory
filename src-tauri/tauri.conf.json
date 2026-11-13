@@ -39,6 +39,9 @@
       "wix": {
         "language": "ko-KR"
       }
+    },
+    "macOS": {
+      "signingIdentity": "-"
     }
   }
 }

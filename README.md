@@ -65,6 +65,26 @@ Mac 메뉴 막대 / Windows 트레이에 상주하면서 CPU, GPU, 메모리, �
 
 첫 버전에 없는 것: 프로세스별 목록, 온도·팬 속도, 경고 알림, 기록 저장.
 
+## 내려받아 쓰기
+
+Rust나 Node를 설치할 필요가 없습니다. [Releases](../../releases/latest)에서 파일 하나만 받으면 됩니다.
+
+| OS | 받을 파일 |
+|----|-----------|
+| macOS (Apple Silicon, Intel 공용) | `먼작귀모니터링_<버전>_universal.dmg` |
+| Windows 10 / 11 | `먼작귀모니터링_<버전>_x64-setup.exe` |
+
+서명(유료 인증서)이 없는 앱이라 처음 열 때 한 번 경고가 뜹니다.
+
+- **macOS**: `.dmg`를 열어 앱을 응용 프로그램 폴더로 옮기고 실행합니다. "열 수 없습니다"가 뜨면
+  시스템 설정 → 개인정보 보호 및 보안 → 아래쪽의 **그래도 열기**를 누릅니다. 그 뒤로는 그냥 열립니다.
+  그래도 열리지 않으면 터미널에서 `xattr -dr com.apple.quarantine /Applications/먼작귀모니터링.app` 을 한 번 실행합니다.
+- **Windows**: 설치 파일을 실행했을 때 "Windows의 PC 보호"가 뜨면 **추가 정보 → 실행**을 누릅니다.
+
+> Windows용 파일은 GitHub의 Windows 기기에서 자동으로 만든 것이고, 실제 Windows PC에서 실행해 확인한 적은 없습니다.
+
+새 버전은 `v0.2.0` 같은 태그를 올리면 `.github/workflows/release.yml`이 자동으로 빌드해 Releases에 올립니다.
+
 ## 개발 실행
 
 필요한 것: [Rust](https://rustup.rs), Node.js 20 이상.
