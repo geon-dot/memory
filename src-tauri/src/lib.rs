@@ -1,3 +1,4 @@
+mod gpu;
 mod snapshot;
 
 pub fn run() {
