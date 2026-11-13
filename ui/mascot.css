@@ -1,5 +1,6 @@
-/* 칩이, the widget's mascot (drawn by mascot.js). The host element carries
-   the mood (`data-mood`) and the motion switches (`paused`, `still`). */
+/* The widget's mascot (drawn by mascot.js): 칩이, or one of the picture
+   mascots. The host element carries the mood (`data-mood`), which mascot it
+   is (`data-mascot`) and the motion switches (`paused`, `still`). */
 .mascot {
   /* 칩이 keeps the same colours in both themes. */
   --chip-line: #5a4030;
@@ -14,10 +15,23 @@
   pointer-events: none;
 }
 
-.chip {
+.chip,
+.pic {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* A picture mascot: of its three pictures, the one for the mood. They are
+   the same in both themes; their dark outline and light bodies read on the
+   butter page and on the dark one. */
+.pic image {
+  display: none;
+}
+[data-mood="calm"] .pic .p-calm,
+[data-mood="busy"] .pic .p-busy,
+[data-mood="hot"] .pic .p-hot {
+  display: inline;
 }
 
 .chip .ground { fill: var(--ground); }
@@ -70,9 +84,17 @@
    hand animation, and every step is a repaint that costs CPU in the web,
    GPU and app processes (the breathing alone measured about 1% of a core at
    twice this many steps). Steps of one mood fall on the same instants.
-   Everything moves inside the one small SVG; no element gets its own
-   compositing layer. */
-.chip .whole,
+   Both kinds of mascot move the same way: the whole figure (`.whole`: 칩이's
+   drawing, or the picture of the mood) breathes when calm, bobs when busy
+   and shakes when hot, from its feet. Everything moves inside the one small
+   SVG, pictures included; no element gets its own compositing layer. */
+.chip,
+.pic {
+  /* A bob or a hop may go a few pixels over the box. */
+  overflow: visible;
+}
+.mascot .whole,
+.mascot .jump,
 .chip .open,
 .chip .sweat,
 .chip .steam {
@@ -80,13 +102,13 @@
   transform-origin: 50% 100%;
 }
 
-.chip .whole {
+.mascot .whole {
   animation: breathe 4.6s steps(2) infinite;
 }
-[data-mood="busy"] .chip .whole {
+[data-mood="busy"] .whole {
   animation: bob 0.6s steps(2) infinite alternate;
 }
-[data-mood="hot"] .chip .whole {
+[data-mood="hot"] .whole {
   animation: shake 2.4s steps(1) infinite;
 }
 [data-mood="busy"] .chip .sweat {
@@ -96,7 +118,13 @@
   animation: steam 1.6s steps(4) infinite;
 }
 
-/* A blink: main.js adds the class for one short cel every few seconds. */
+/* A new mood (or a newly chosen mascot) arrives with one small hop: squash,
+   up, land, each a held cel. mascot.js sets `changed` to play it. */
+.mascot.changed .jump {
+  animation: hop 0.36s steps(1) 1;
+}
+
+/* A blink: mascot.js adds the class for one short cel every few seconds. */
 .chip .open {
   transform-origin: 50% 50%;
 }
@@ -128,18 +156,26 @@
   40% { opacity: 0.9; }
   to { transform: translateY(-3px); opacity: 0; }
 }
+@keyframes hop {
+  0% { transform: scale(1.08, 0.92); }
+  34% { transform: translateY(-5px) scale(0.96, 1.05); }
+  67% { transform: scale(1.04, 0.96); }
+  100% { transform: none; }
+}
 
-/* 칩이 holds still while the window is not showing, and always when its
-   constant movement is switched off (see mountMascot). */
-.paused .chip * {
+/* The mascot holds still while the window is not showing, and keeps from
+   constant movement when that is switched off (see mountMascot); the hop on
+   a change still plays then. */
+.paused svg * {
   animation-play-state: paused;
 }
-.still .chip * {
+.still .whole,
+.still .whole * {
   animation: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chip * {
+  .mascot svg * {
     animation: none !important;
   }
 }

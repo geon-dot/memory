@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "System Monitor",
+  "productName": "먼작귀모니터링",
   "version": "0.1.0",
   "identifier": "com.geon.systemmonitor",
   "build": {
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "System Monitor",
+        "title": "먼작귀모니터링",
         "width": 300,
         "height": 320,
         "resizable": false,

@@ -16,6 +16,7 @@ macro_rules! diag {
 
 mod collector;
 mod gpu;
+mod mascot;
 mod snapshot;
 mod tray;
 mod widget;
@@ -35,6 +36,20 @@ fn set_pinned(window: tauri::WebviewWindow, pinned: bool) -> Result<(), String> 
 #[tauri::command]
 fn pinned(app: tauri::AppHandle) -> bool {
     widget::is_pinned(&app)
+}
+
+/// The chosen mascot's id, for a newly opened widget to draw.
+#[tauri::command]
+fn mascot(app: tauri::AppHandle) -> &'static str {
+    widget::mascot(&app).id()
+}
+
+/// A line from the widget about what it shows (which mascot and picture, in
+/// which mood), printed with the diagnostics. The web view cannot be looked
+/// at from outside, so this is how a check sees what it drew.
+#[tauri::command]
+fn diag(line: String) {
+    diag!("widget: {line}");
 }
 
 fn diag_enabled() -> bool {
@@ -79,7 +94,7 @@ pub fn run() {
             widget::run_from_any_thread(app, action);
         }))
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![set_pinned, pinned])
+        .invoke_handler(tauri::generate_handler![set_pinned, pinned, mascot, diag])
         // Closing the widget (✕, or the system closing the window) releases
         // its window and web view; the app lives on in the tray and quits from
         // the tray menu.
@@ -98,6 +113,7 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             app.manage(widget::WidgetState::load(app.handle()));
+            diag!("mascot: {} (loaded)", widget::mascot(app.handle()).id());
             // The first widget comes from tauri.conf.json; pin it if the
             // 📌 was on when the app last ran.
             if widget::is_pinned(app.handle()) {
@@ -110,7 +126,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building System Monitor");
+        .expect("error while building 먼작귀모니터링");
 
     app.run(|_app, event| match event {
         // The last window closing asks to exit; stay in the tray instead.

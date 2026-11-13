@@ -6,6 +6,8 @@ import {
   usageLabel,
   recentAverage,
   moodOf,
+  holdMood,
+  coreLayout,
 } from './format.js';
 import { mountMascot } from './mascot.js';
 
@@ -14,11 +16,14 @@ const SPARK_W = 100;
 const SPARK_H = 24;
 // A reading at or above this percentage is drawn in the warning colour.
 const HOT_PERCENT = 90;
-// 칩이's constant movement (breathing, bobbing, blinking). The one switch
+// The mascot's constant movement (breathing, bobbing, blinking). The one switch
 // for it. How often readings arrive is the app's side: SAMPLE_INTERVAL in
 // lib.rs.
 const IDLE_MOTION = true;
-// What 칩이 says in each mood.
+// A mood that has just appeared stays at least this long, so readings near
+// a limit do not swap the face and the line every second.
+const MOOD_HOLD_MS = 5000;
+// What the mascot says in each mood.
 const MOOD_TEXT = { calm: '한가해요', busy: '바빠요!', hot: '앗, 뜨거워!' };
 
 const $ = (id) => document.getElementById(id);
@@ -63,6 +68,10 @@ function renderSpark(lineEl, areaEl, history) {
 function renderCores(cores) {
   // Rebuild only when the core count changes; otherwise just resize the bars.
   if (el.cpuCores.childElementCount !== cores.length) {
+    const { columns, rows, gapX, gapY } = coreLayout(cores.length);
+    el.cpuCores.style.setProperty('--columns', columns);
+    el.cpuCores.style.gap = `${gapY}px ${gapX}px`;
+    el.cpuCores.classList.toggle('rows', rows > 1);
     el.cpuCores.replaceChildren(
       ...cores.map(() => {
         const bar = document.createElement('div');
@@ -86,14 +95,35 @@ function renderMeter(percentEl, valueEl, fillEl, used, total) {
   return pct;
 }
 
-const mascot = mountMascot($('mascot'), { idleMotion: IDLE_MOTION });
-let shownMood = 'calm';
+const tauri = window.__TAURI__;
 
-function renderMood(mood) {
-  if (mood === shownMood) return;
-  shownMood = mood;
-  mascot.setMood(mood);
-  el.moodText.textContent = MOOD_TEXT[mood];
+// Which mascot: the app keeps the choice made in its tray menu (this web
+// view has no storage that outlives it). Opened in a browser,
+// `?mascot=<name>` picks one. No answer, or an unknown name, gives the
+// default one.
+async function chosenMascot() {
+  if (!tauri) return new URLSearchParams(location.search).get('mascot');
+  try {
+    return await tauri.core.invoke('mascot');
+  } catch {
+    return null;
+  }
+}
+
+const mascot = mountMascot($('mascot'), {
+  idleMotion: IDLE_MOTION,
+  name: await chosenMascot(),
+  report: (line) => tauri?.core.invoke('diag', { line }),
+});
+// The mood on screen and when it appeared; it starts as the page is drawn.
+let shown = { mood: 'calm', since: -Infinity };
+
+function renderMood(wanted) {
+  const next = holdMood(shown, wanted, performance.now(), MOOD_HOLD_MS);
+  if (next === shown) return;
+  shown = next;
+  mascot.setMood(shown.mood);
+  el.moodText.textContent = MOOD_TEXT[shown.mood];
   // Replay the bubble's little pop for the new line, when there is someone
   // to see it.
   el.say.classList.remove('pop');
@@ -124,8 +154,6 @@ function render(s) {
   renderMood(moodOf({ cpu: recentAverage(cpuHistory), gpu: s.gpu, memPercent }));
 }
 
-const tauri = window.__TAURI__;
-
 async function setPinned(pinned) {
   el.pin.setAttribute('aria-pressed', String(pinned));
   if (tauri) await tauri.core.invoke('set_pinned', { pinned });
@@ -143,6 +171,8 @@ el.hide.addEventListener('click', () => {
 
 if (tauri) {
   tauri.event.listen('snapshot', (event) => render(event.payload));
+  // Chosen in the tray menu while this widget is open.
+  tauri.event.listen('mascot', (event) => mascot.setMascot(event.payload));
   // The app keeps the pin (this web view has no storage that outlives it)
   // and has already applied it to the window; only the button needs it.
   tauri.core.invoke('pinned').then((pinned) => {

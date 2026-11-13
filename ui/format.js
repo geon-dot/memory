@@ -66,3 +66,29 @@ export function moodOf({ cpu, gpu, memPercent }) {
   if (cpu >= 45 || (gpu ?? 0) >= 60) return 'busy';
   return 'calm';
 }
+
+/**
+ * The mood to show, given the one showing (`{ mood, since }`, or nothing
+ * yet), the mood the newest reading asks for, and the time now in
+ * milliseconds. A mood that has just appeared stays for `holdMs`, so
+ * readings wavering around a limit do not swap the mascot and its line every
+ * second. Returns `shown` itself when nothing changes.
+ */
+export function holdMood(shown, wanted, now, holdMs = 5000) {
+  if (!shown) return { mood: wanted, since: now };
+  if (wanted === shown.mood || now - shown.since < holdMs) return shown;
+  return { mood: wanted, since: now };
+}
+
+/**
+ * How the per-core bars are laid out so that any core count fits the height
+ * of one row of bars: one row up to 32 cores, then two half-height rows
+ * (with 1px gaps from 65 cores), then more rows of 64. Gaps are in px.
+ */
+export function coreLayout(count) {
+  if (count <= 32) return { columns: Math.max(1, count), rows: 1, gapX: 3, gapY: 0 };
+  if (count <= 128) {
+    return { columns: Math.ceil(count / 2), rows: 2, gapX: count <= 64 ? 3 : 1, gapY: 2 };
+  }
+  return { columns: 64, rows: Math.ceil(count / 64), gapX: 1, gapY: 1 };
+}

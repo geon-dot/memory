@@ -1,13 +1,19 @@
-// 칩이, the widget's mascot. Everything that draws and moves it is here and
-// in mascot.css; the rest of the widget only mounts it and tells it the mood.
-// Another mascot would replace these two files and keep `mountMascot`.
+// The widget's mascot. Everything that draws and moves it is here and in
+// mascot.css; the rest of the widget only mounts it, tells it the mood and
+// which mascot was chosen (the names are in mascots.js).
+//
+// There are two kinds. 칩이 is drawn here as an SVG whose parts change with
+// the mood. The others are pictures, one PNG per mood (ui/mascot/<name>/),
+// shown inside the same kind of SVG box so that both kinds move by the same
+// rules in mascot.css.
+import { DEFAULT_MASCOT, mascotOf, picturesOf } from './mascots.js';
 
-// The parts of every face are all in the one drawing; mascot.css shows the
-// ones that belong to the mood on the host element (`data-mood`).
-const ART = `
+// 칩이. The parts of every face are all in the one drawing; mascot.css shows
+// the ones that belong to the mood on the host element (`data-mood`).
+const CHIP_ART = `
   <svg class="chip" viewBox="0 0 64 64" aria-hidden="true">
     <ellipse class="ground" cx="32" cy="59.5" rx="16" ry="2.4" />
-    <g class="whole">
+    <g class="jump"><g class="whole">
       <g class="steam">
         <path d="M24 8.5q-3-2.8 0-5.6" />
         <path d="M40 8.5q3-2.8 0-5.6" />
@@ -42,9 +48,24 @@ const ART = `
       <ellipse class="mouth m-busy" cx="32" cy="39.6" rx="1.9" ry="2.3" />
       <path class="mouth m-hot" d="M26.8 40.4q2.6-2.8 5.2 0t5.2 0" />
       <path class="sweat" d="M54.5 9.5q3.4 4.4 0 6.4q-3.4-2 0-6.4z" />
-    </g>
+    </g></g>
   </svg>
 `;
+
+// A picture mascot: the three pictures stacked in one box, of which
+// mascot.css shows the one for the mood. All three are in the page from the
+// start, so a change of mood has nothing to load. Like 칩이, the figure is a
+// `.whole` (what breathes, bobs and shakes) inside a `.jump` (what hops when
+// the mood changes).
+function pictureArt(pictures) {
+  const image = (mood) =>
+    `<image class="p-${mood}" href="${pictures[mood]}" width="64" height="64" />`;
+  return `
+  <svg class="pic" viewBox="0 0 64 64" aria-hidden="true">
+    <g class="jump"><g class="whole">${image('calm')}${image('busy')}${image('hot')}</g></g>
+  </svg>
+`;
+}
 
 // 칩이 blinks on a timer aimed at the next change (eyes open for a few
 // seconds of uneven length, shut for one short cel), not on a frame loop.
@@ -53,23 +74,27 @@ const BLINK_JITTER_MS = 1600;
 const BLINK_SHUT_MS = 130;
 
 /**
- * Draws the mascot into `host` and returns `{ setMood }`, where a mood is
- * 'calm', 'busy' or 'hot'. With `idleMotion` off the mascot still changes
- * face with the mood but holds still.
+ * Draws mascot `name` into `host` and returns `{ setMood, setMascot }`,
+ * where a mood is 'calm', 'busy' or 'hot' and a mascot is one of MASCOTS.
+ * With `idleMotion` off the mascot still changes face with the mood but
+ * holds still. A picture mascot whose pictures cannot be read is replaced
+ * by 칩이. `report` is given a line about what is on show whenever that
+ * changes (the app prints it in its diagnostics).
  */
-export function mountMascot(host, { idleMotion = true } = {}) {
-  host.innerHTML = ART;
+export function mountMascot(
+  host,
+  { idleMotion = true, name = DEFAULT_MASCOT, report = () => {} } = {},
+) {
   host.dataset.mood = 'calm';
-  const chip = host.querySelector('.chip');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let blinkTimer = 0;
 
-  function blinkLater() {
+  function blinkLater(chip) {
     blinkTimer = setTimeout(() => {
       chip.classList.add('blink');
       blinkTimer = setTimeout(() => {
         chip.classList.remove('blink');
-        blinkLater();
+        blinkLater(chip);
       }, BLINK_SHUT_MS);
     }, BLINK_OPEN_MS + Math.random() * BLINK_JITTER_MS);
   }
@@ -80,16 +105,65 @@ export function mountMascot(host, { idleMotion = true } = {}) {
     host.classList.toggle('still', !idleMotion);
     host.classList.toggle('paused', document.hidden);
     clearTimeout(blinkTimer);
+    const chip = host.querySelector('.chip');
+    if (!chip) return;
     chip.classList.remove('blink');
-    if (!still) blinkLater();
+    if (!still) blinkLater(chip);
   }
+
+  // Says what is on show: mascot, mood, the picture (or that it is drawn)
+  // and the name of the movement.
+  function tell() {
+    const { mascot, mood } = host.dataset;
+    const picture = host.querySelector(`.p-${mood}`);
+    const movement = getComputedStyle(host.querySelector('.whole')).animationName;
+    report(`${mascot} ${mood}: ${picture ? picture.getAttribute('href') : 'drawn'}, ${movement}`);
+  }
+
+  function draw(wanted) {
+    const shown = mascotOf(wanted);
+    const pictures = picturesOf(shown);
+    host.dataset.mascot = shown;
+    host.innerHTML = pictures ? pictureArt(pictures) : CHIP_ART;
+    syncMotion();
+    tell();
+    if (!pictures) return;
+    // If any of the pictures cannot be read, 칩이 stands in (unless another
+    // mascot has been chosen by then).
+    for (const src of Object.values(pictures)) {
+      const probe = new Image();
+      probe.onload = () => report(`read ${src} ${probe.naturalWidth}x${probe.naturalHeight}`);
+      probe.onerror = () => {
+        report(`could not read ${src}`);
+        if (host.dataset.mascot === shown) draw('chip');
+      };
+      probe.src = src;
+    }
+  }
+
+  // Replays the hop, when there is someone to see it.
+  function hop() {
+    host.classList.remove('changed');
+    if (document.hidden) return;
+    void host.offsetWidth;
+    host.classList.add('changed');
+  }
+
   document.addEventListener('visibilitychange', syncMotion);
   reducedMotion.addEventListener('change', syncMotion);
-  syncMotion();
+  draw(name);
 
   return {
     setMood(mood) {
+      if (mood === host.dataset.mood) return;
       host.dataset.mood = mood;
+      hop();
+      tell();
+    },
+    setMascot(wanted) {
+      if (mascotOf(wanted) === host.dataset.mascot) return;
+      draw(wanted);
+      hop();
     },
   };
 }

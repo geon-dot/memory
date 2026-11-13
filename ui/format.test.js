@@ -9,6 +9,8 @@ import {
   usageLabel,
   recentAverage,
   moodOf,
+  holdMood,
+  coreLayout,
 } from './format.js';
 
 test('formatBytes', () => {
@@ -69,4 +71,53 @@ test('moodOf: hot from sustained CPU or nearly full memory', () => {
   assert.equal(moodOf({ cpu: 5, gpu: null, memPercent: 90 }), 'hot');
   // A busy GPU alone does not make it hot.
   assert.equal(moodOf({ cpu: 5, gpu: 100, memPercent: 50 }), 'busy');
+});
+
+test('holdMood: the first mood is taken at once', () => {
+  assert.deepEqual(holdMood(undefined, 'busy', 1000), { mood: 'busy', since: 1000 });
+});
+
+test('holdMood: a mood stays for at least the hold time', () => {
+  const shown = { mood: 'busy', since: 1000 };
+  assert.equal(holdMood(shown, 'calm', 2000, 5000), shown);
+  assert.equal(holdMood(shown, 'hot', 5999, 5000), shown);
+  assert.deepEqual(holdMood(shown, 'calm', 6000, 5000), { mood: 'calm', since: 6000 });
+});
+
+test('holdMood: the same mood again does not restart the hold', () => {
+  const shown = { mood: 'busy', since: 1000 };
+  assert.equal(holdMood(shown, 'busy', 9000, 5000), shown);
+});
+
+test('holdMood: readings that flip every second change the mood once per hold', () => {
+  let shown;
+  const seen = [];
+  for (let s = 0; s < 12; s++) {
+    const next = holdMood(shown, s % 2 ? 'busy' : 'calm', s * 1000, 5000);
+    if (next !== shown) seen.push([s, next.mood]);
+    shown = next;
+  }
+  assert.deepEqual(seen, [[0, 'calm'], [5, 'busy'], [10, 'calm']]);
+});
+
+test('coreLayout: up to 32 cores are one row of bars', () => {
+  assert.deepEqual(coreLayout(10), { columns: 10, rows: 1, gapX: 3, gapY: 0 });
+  assert.deepEqual(coreLayout(32), { columns: 32, rows: 1, gapX: 3, gapY: 0 });
+});
+
+test('coreLayout: more cores become two half-height rows, then narrower gaps', () => {
+  assert.deepEqual(coreLayout(33), { columns: 17, rows: 2, gapX: 3, gapY: 2 });
+  assert.deepEqual(coreLayout(48), { columns: 24, rows: 2, gapX: 3, gapY: 2 });
+  assert.deepEqual(coreLayout(64), { columns: 32, rows: 2, gapX: 3, gapY: 2 });
+  assert.deepEqual(coreLayout(96), { columns: 48, rows: 2, gapX: 1, gapY: 2 });
+  assert.deepEqual(coreLayout(128), { columns: 64, rows: 2, gapX: 1, gapY: 2 });
+});
+
+test('coreLayout: beyond 128 cores rows are added, 64 bars to a row', () => {
+  assert.deepEqual(coreLayout(192), { columns: 64, rows: 3, gapX: 1, gapY: 1 });
+  assert.deepEqual(coreLayout(256), { columns: 64, rows: 4, gapX: 1, gapY: 1 });
+});
+
+test('coreLayout: no cores still gives a valid grid', () => {
+  assert.deepEqual(coreLayout(0), { columns: 1, rows: 1, gapX: 3, gapY: 0 });
 });
