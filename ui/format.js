@@ -48,3 +48,21 @@ export function usageLabel(used, total) {
   const [unit, name] = total >= TB ? [TB, 'TB'] : [GB, 'GB'];
   return `${(used / unit).toFixed(1)} / ${(total / unit).toFixed(1)} ${name}`;
 }
+
+/** Mean of the newest `n` values; 0 for an empty list. */
+export function recentAverage(arr, n = 5) {
+  const tail = arr.slice(-n);
+  if (tail.length === 0) return 0;
+  return tail.reduce((a, b) => a + b, 0) / tail.length;
+}
+
+/**
+ * How the machine is doing, for the mascot: 'hot', 'busy' or 'calm'.
+ * `cpu` is a smoothed CPU percentage, `gpu` a percentage or null,
+ * `memPercent` the share of memory in use.
+ */
+export function moodOf({ cpu, gpu, memPercent }) {
+  if (cpu >= 85 || memPercent >= 90) return 'hot';
+  if (cpu >= 45 || (gpu ?? 0) >= 60) return 'busy';
+  return 'calm';
+}

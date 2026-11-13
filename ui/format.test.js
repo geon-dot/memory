@@ -7,6 +7,8 @@ import {
   sparklinePoints,
   gpuLabel,
   usageLabel,
+  recentAverage,
+  moodOf,
 } from './format.js';
 
 test('formatBytes', () => {
@@ -41,4 +43,30 @@ test('labels', () => {
   assert.equal(usageLabel(9.2 * 1024 ** 3, 16 * 1024 ** 3), '9.2 / 16.0 GB');
   assert.equal(usageLabel(1.5 * 1024 ** 4, 2 * 1024 ** 4), '1.5 / 2.0 TB');
   assert.equal(usageLabel(5, -1), 'N/A');
+});
+
+test('recentAverage takes the newest values', () => {
+  assert.equal(recentAverage([], 5), 0);
+  assert.equal(recentAverage([40], 5), 40);
+  assert.equal(recentAverage([0, 0, 10, 20, 30], 3), 20);
+  assert.equal(recentAverage([10, 20, 30, 40, 50, 60]), 40);
+});
+
+test('moodOf: calm when nothing is loaded', () => {
+  assert.equal(moodOf({ cpu: 12, gpu: 6, memPercent: 57 }), 'calm');
+  assert.equal(moodOf({ cpu: 44.9, gpu: 59.9, memPercent: 89 }), 'calm');
+  assert.equal(moodOf({ cpu: 0, gpu: null, memPercent: 0 }), 'calm');
+});
+
+test('moodOf: busy from CPU or GPU load', () => {
+  assert.equal(moodOf({ cpu: 45, gpu: 0, memPercent: 50 }), 'busy');
+  assert.equal(moodOf({ cpu: 10, gpu: 60, memPercent: 50 }), 'busy');
+  assert.equal(moodOf({ cpu: 84.9, gpu: null, memPercent: 50 }), 'busy');
+});
+
+test('moodOf: hot from sustained CPU or nearly full memory', () => {
+  assert.equal(moodOf({ cpu: 85, gpu: 0, memPercent: 50 }), 'hot');
+  assert.equal(moodOf({ cpu: 5, gpu: null, memPercent: 90 }), 'hot');
+  // A busy GPU alone does not make it hot.
+  assert.equal(moodOf({ cpu: 5, gpu: 100, memPercent: 50 }), 'busy');
 });
