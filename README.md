@@ -189,8 +189,8 @@ scripts/measure-cpu.sh --app "src-tauri/target/release/bundle/macos/System Monit
 | `ui/` | 위젯 화면 (프레임워크 없는 HTML/CSS/JS). 칩이는 `ui/mascot.js`가 그리는 SVG, 움직임은 `ui/mascot.css` |
 | `ui/format.js` | 표시용 순수 계산 (단위, 그래프 좌표, 코어 막대 배치, 칩이 상태 판정과 유지) |
 | `ui/demo.js` | 브라우저에서 화면만 볼 때 쓰는 가짜 측정값 (앱에서는 쓰지 않음) |
-| `src-tauri/icons/src/` | 앱·트레이 아이콘 원본 SVG (직접 그린 것) |
-| `scripts/build-icons.sh` | SVG에서 아이콘 파일 만들기 (macOS) |
+| `src-tauri/icons/src/` | 앱 아이콘(`icon-large.png`)과 메뉴 막대·트레이 아이콘(`icon-small.png`)의 원본 그림 (팬이 만든 2차 창작물) |
+| `scripts/build-icons.sh` | 원본 그림에서 아이콘 파일 만들기 (macOS) |
 | `scripts/measure-memory.sh` | 실행 중인 앱의 메모리 측정 (macOS) |
 | `scripts/measure-cpu.sh` | 실행 중인 앱의 평균 CPU 측정 (macOS) |
 | `docs/design/reference-notes.md` | 화면 디자인의 출처와 수치 |

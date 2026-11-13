@@ -62,13 +62,13 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
                 widget::toggle(tray.app_handle());
             }
         });
-    // The mascot's face, drawn for the tray (sources in icons/src). The menu
-    // bar gets a one-colour template image, which macOS tints for a light or
-    // a dark bar; other trays get the colour drawing.
+    // The three characters in their own colours (sources in icons/src), not
+    // a one-colour template image: their dark outline and light bodies show
+    // on a light menu bar and on a dark one. The menu bar draws the icon
+    // 18pt high, so macOS gets it at its own shape (48x36px); other trays
+    // want a square.
     #[cfg(target_os = "macos")]
-    let builder = builder
-        .icon(tauri::include_image!("icons/tray/template.png"))
-        .icon_as_template(true);
+    let builder = builder.icon(tauri::include_image!("icons/tray/menubar.png"));
     #[cfg(not(target_os = "macos"))]
     let builder = builder.icon(tauri::include_image!("icons/tray/color.png"));
     builder.build(app)?;
