@@ -7,9 +7,11 @@
 //! the place the old one was.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use tauri::{AppHandle, LogicalPosition, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 pub const WINDOW_LABEL: &str = "main";
 
@@ -87,14 +89,17 @@ pub enum Action {
     Show,
     Hide,
     Toggle,
+    /// Tell the user the app is already running.
+    Notice,
 }
 
-/// Starting the app again opens the widget. With diagnostics on, `--hide`,
-/// `--toggle` and `--show` instead drive it the way the tray does, so the
-/// memory of each state can be measured without clicking.
+/// Starting the app again does not start a second copy; the running one says
+/// it is already running. With diagnostics on, `--hide`, `--toggle` and
+/// `--show` instead drive the widget the way the tray does, so the memory of
+/// each state can be measured without clicking.
 pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
     if !diagnostics {
-        return Action::Show;
+        return Action::Notice;
     }
     args.iter()
         .skip(1)
@@ -104,7 +109,27 @@ pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
             "--show" => Some(Action::Show),
             _ => None,
         })
-        .unwrap_or(Action::Show)
+        .unwrap_or(Action::Notice)
+}
+
+/// Set while the "already running" dialog is up, so launching the app several
+/// times shows one dialog, not a stack of them.
+static NOTICE_OPEN: AtomicBool = AtomicBool::new(false);
+
+/// Shows the "already running" dialog. Does not block the caller.
+pub fn notice(app: &AppHandle) {
+    if NOTICE_OPEN.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    diag!("notice: already running");
+    app.dialog()
+        .message("System Monitor가 이미 실행 중입니다.\n메뉴 막대(트레이)의 아이콘을 눌러 위젯을 여세요.")
+        .title("System Monitor")
+        .kind(MessageDialogKind::Info)
+        .show(|ok| {
+            diag!("notice: closed ({ok})");
+            NOTICE_OPEN.store(false, Ordering::SeqCst);
+        });
 }
 
 /// Runs `action` on the main thread; for callers off it, such as the
@@ -116,6 +141,7 @@ pub fn run_from_any_thread(app: &AppHandle, action: Action) {
         Action::Show => show(&handle),
         Action::Hide => hide(&handle),
         Action::Toggle => toggle(&handle),
+        Action::Notice => notice(&handle),
     });
 }
 
@@ -208,23 +234,23 @@ mod tests {
     }
 
     #[test]
-    fn second_launch_opens_the_widget() {
+    fn second_launch_says_the_app_is_already_running() {
         let plain = args(&["system-monitor"]);
-        assert_eq!(second_launch_action(&plain, false), Action::Show);
-        assert_eq!(second_launch_action(&plain, true), Action::Show);
+        assert_eq!(second_launch_action(&plain, false), Action::Notice);
+        assert_eq!(second_launch_action(&plain, true), Action::Notice);
     }
 
     #[test]
     fn launch_flags_work_only_with_diagnostics_on() {
         let hide = args(&["system-monitor", "--hide"]);
-        assert_eq!(second_launch_action(&hide, false), Action::Show);
+        assert_eq!(second_launch_action(&hide, false), Action::Notice);
         assert_eq!(second_launch_action(&hide, true), Action::Hide);
         let toggle = args(&["system-monitor", "--toggle"]);
         assert_eq!(second_launch_action(&toggle, true), Action::Toggle);
         let show = args(&["system-monitor", "--show"]);
         assert_eq!(second_launch_action(&show, true), Action::Show);
         let other = args(&["system-monitor", "--whatever"]);
-        assert_eq!(second_launch_action(&other, true), Action::Show);
+        assert_eq!(second_launch_action(&other, true), Action::Notice);
     }
 
     #[test]
