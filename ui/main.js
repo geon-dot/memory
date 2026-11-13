@@ -11,7 +11,6 @@ const SPARK_W = 100;
 const SPARK_H = 20;
 // A meter at or above this percentage is drawn in the warning colour.
 const HOT_PERCENT = 90;
-const PIN_KEY = 'pinned';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -74,28 +73,10 @@ function render(s) {
   renderMeter(el.diskValue, el.diskFill, s.disk_used, s.disk_total);
 }
 
-// localStorage can be unavailable; the pin preference is a convenience only.
-function loadPinned() {
-  try {
-    return localStorage.getItem(PIN_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function savePinned(pinned) {
-  try {
-    localStorage.setItem(PIN_KEY, pinned ? '1' : '0');
-  } catch {
-    // Nothing to do: the window still pins for this session.
-  }
-}
-
 const tauri = window.__TAURI__;
 
 async function setPinned(pinned) {
   el.pin.setAttribute('aria-pressed', String(pinned));
-  savePinned(pinned);
   if (tauri) await tauri.core.invoke('set_pinned', { pinned });
 }
 
@@ -103,13 +84,19 @@ el.pin.addEventListener('click', () => {
   setPinned(el.pin.getAttribute('aria-pressed') !== 'true');
 });
 
+// Closing releases the window and its web view; the tray brings back a new
+// one, which asks the app below whether it is pinned.
 el.hide.addEventListener('click', () => {
-  if (tauri) tauri.window.getCurrentWindow().hide();
+  if (tauri) tauri.window.getCurrentWindow().close();
 });
 
 // Opened directly in a browser there is no backend; the rows keep their
 // placeholder dashes.
 if (tauri) {
   tauri.event.listen('snapshot', (event) => render(event.payload));
-  if (loadPinned()) setPinned(true);
+  // The app keeps the pin (this web view has no storage that outlives it)
+  // and has already applied it to the window; only the button needs it.
+  tauri.core.invoke('pinned').then((pinned) => {
+    el.pin.setAttribute('aria-pressed', String(pinned));
+  });
 }

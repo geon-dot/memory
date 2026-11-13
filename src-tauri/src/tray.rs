@@ -3,12 +3,12 @@
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::snapshot::{tray_title, Snapshot};
+use crate::widget;
 
 pub const TRAY_ID: &str = "main";
-const WINDOW_LABEL: &str = "main";
 const MENU_OPEN: &str = "open";
 const MENU_QUIT: &str = "quit";
 
@@ -24,7 +24,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            MENU_OPEN => show_window(app),
+            MENU_OPEN => widget::show(app),
             MENU_QUIT => app.exit(0),
             _ => {}
         })
@@ -35,7 +35,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = event
             {
-                toggle_window(tray.app_handle());
+                widget::toggle(tray.app_handle());
             }
         });
     if let Some(icon) = app.default_window_icon() {
@@ -56,23 +56,5 @@ pub fn update_title(app: &AppHandle, s: &Snapshot) {
     #[cfg(target_os = "macos")]
     let _ = tray.set_title(Some(&title));
     let _ = tray.set_tooltip(Some(&title));
-}
-
-/// Brings the widget window to the front, un-hiding it if needed.
-pub fn show_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
-
-fn toggle_window(app: &AppHandle) {
-    let Some(window) = app.get_webview_window(WINDOW_LABEL) else {
-        return;
-    };
-    if window.is_visible().unwrap_or(false) {
-        let _ = window.hide();
-    } else {
-        show_window(app);
-    }
+    diag!("tray: {title}");
 }
