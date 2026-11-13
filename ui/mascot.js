@@ -1,10 +1,16 @@
-// 칩이, the widget's mascot. Everything that draws and moves it is here and
-// in mascot.css; the rest of the widget only mounts it and tells it the mood.
-// Another mascot would replace these two files and keep `mountMascot`.
+// The widget's mascot. Everything that draws and moves it is here and in
+// mascot.css; the rest of the widget only mounts it, tells it the mood and
+// which mascot was chosen (the names are in mascots.js).
+//
+// There are two kinds. 칩이 is drawn here as an SVG whose parts change with
+// the mood. The others are pictures, one PNG per mood (ui/mascot/<name>/),
+// shown inside the same kind of SVG box so that both kinds move by the same
+// rules in mascot.css.
+import { DEFAULT_MASCOT, mascotOf, picturesOf } from './mascots.js';
 
-// The parts of every face are all in the one drawing; mascot.css shows the
-// ones that belong to the mood on the host element (`data-mood`).
-const ART = `
+// 칩이. The parts of every face are all in the one drawing; mascot.css shows
+// the ones that belong to the mood on the host element (`data-mood`).
+const CHIP_ART = `
   <svg class="chip" viewBox="0 0 64 64" aria-hidden="true">
     <ellipse class="ground" cx="32" cy="59.5" rx="16" ry="2.4" />
     <g class="whole">
@@ -46,6 +52,19 @@ const ART = `
   </svg>
 `;
 
+// A picture mascot: the three pictures stacked in one box, of which
+// mascot.css shows the one for the mood. All three are in the page from the
+// start, so a change of mood has nothing to load.
+function pictureArt(pictures) {
+  const image = (mood) =>
+    `<image class="p-${mood}" href="${pictures[mood]}" width="64" height="64" />`;
+  return `
+  <svg class="pic" viewBox="0 0 64 64" aria-hidden="true">
+    <g class="whole">${image('calm')}${image('busy')}${image('hot')}</g>
+  </svg>
+`;
+}
+
 // 칩이 blinks on a timer aimed at the next change (eyes open for a few
 // seconds of uneven length, shut for one short cel), not on a frame loop.
 const BLINK_OPEN_MS = 2400;
@@ -53,23 +72,23 @@ const BLINK_JITTER_MS = 1600;
 const BLINK_SHUT_MS = 130;
 
 /**
- * Draws the mascot into `host` and returns `{ setMood }`, where a mood is
- * 'calm', 'busy' or 'hot'. With `idleMotion` off the mascot still changes
- * face with the mood but holds still.
+ * Draws mascot `name` into `host` and returns `{ setMood, setMascot }`,
+ * where a mood is 'calm', 'busy' or 'hot' and a mascot is one of MASCOTS.
+ * With `idleMotion` off the mascot still changes face with the mood but
+ * holds still. A picture mascot whose pictures cannot be read is replaced
+ * by 칩이.
  */
-export function mountMascot(host, { idleMotion = true } = {}) {
-  host.innerHTML = ART;
+export function mountMascot(host, { idleMotion = true, name = DEFAULT_MASCOT } = {}) {
   host.dataset.mood = 'calm';
-  const chip = host.querySelector('.chip');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let blinkTimer = 0;
 
-  function blinkLater() {
+  function blinkLater(chip) {
     blinkTimer = setTimeout(() => {
       chip.classList.add('blink');
       blinkTimer = setTimeout(() => {
         chip.classList.remove('blink');
-        blinkLater();
+        blinkLater(chip);
       }, BLINK_SHUT_MS);
     }, BLINK_OPEN_MS + Math.random() * BLINK_JITTER_MS);
   }
@@ -80,16 +99,40 @@ export function mountMascot(host, { idleMotion = true } = {}) {
     host.classList.toggle('still', !idleMotion);
     host.classList.toggle('paused', document.hidden);
     clearTimeout(blinkTimer);
+    const chip = host.querySelector('.chip');
+    if (!chip) return;
     chip.classList.remove('blink');
-    if (!still) blinkLater();
+    if (!still) blinkLater(chip);
   }
+
+  function draw(wanted) {
+    const shown = mascotOf(wanted);
+    const pictures = picturesOf(shown);
+    host.dataset.mascot = shown;
+    host.innerHTML = pictures ? pictureArt(pictures) : CHIP_ART;
+    syncMotion();
+    if (!pictures) return;
+    // If any of the pictures cannot be read, 칩이 stands in (unless another
+    // mascot has been chosen by then).
+    for (const src of Object.values(pictures)) {
+      const probe = new Image();
+      probe.onerror = () => {
+        if (host.dataset.mascot === shown) draw('chip');
+      };
+      probe.src = src;
+    }
+  }
+
   document.addEventListener('visibilitychange', syncMotion);
   reducedMotion.addEventListener('change', syncMotion);
-  syncMotion();
+  draw(name);
 
   return {
     setMood(mood) {
       host.dataset.mood = mood;
+    },
+    setMascot(wanted) {
+      if (mascotOf(wanted) !== host.dataset.mascot) draw(wanted);
     },
   };
 }

@@ -1,7 +1,8 @@
 // Made-up readings for looking at the widget in a browser (`?demo=calm`,
 // `busy` or `hot`; add `&gpu=none` for a machine without GPU readings,
 // `&pin=1` for the pressed pin, `&cores=24` for another core count,
-// `&live=1` to keep new readings coming once a second).
+// `&live=1` to keep new readings coming once a second, `&mascot=usagi` for
+// another mascot, which main.js reads).
 // Not used inside the app.
 
 const GB = 1024 ** 3;

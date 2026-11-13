@@ -1,5 +1,6 @@
-/* 칩이, the widget's mascot (drawn by mascot.js). The host element carries
-   the mood (`data-mood`) and the motion switches (`paused`, `still`). */
+/* The widget's mascot (drawn by mascot.js): 칩이, or one of the picture
+   mascots. The host element carries the mood (`data-mood`), which mascot it
+   is (`data-mascot`) and the motion switches (`paused`, `still`). */
 .mascot {
   /* 칩이 keeps the same colours in both themes. */
   --chip-line: #5a4030;
@@ -14,10 +15,23 @@
   pointer-events: none;
 }
 
-.chip {
+.chip,
+.pic {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* A picture mascot: of its three pictures, the one for the mood. They are
+   the same in both themes; their dark outline and light bodies read on the
+   butter page and on the dark one. */
+.pic image {
+  display: none;
+}
+[data-mood="calm"] .pic .p-calm,
+[data-mood="busy"] .pic .p-busy,
+[data-mood="hot"] .pic .p-hot {
+  display: inline;
 }
 
 .chip .ground { fill: var(--ground); }

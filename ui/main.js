@@ -10,20 +10,21 @@ import {
   coreLayout,
 } from './format.js';
 import { mountMascot } from './mascot.js';
+import { mascotOf } from './mascots.js';
 
 // Matches the sparkline SVG viewBox in index.html.
 const SPARK_W = 100;
 const SPARK_H = 24;
 // A reading at or above this percentage is drawn in the warning colour.
 const HOT_PERCENT = 90;
-// 칩이's constant movement (breathing, bobbing, blinking). The one switch
+// The mascot's constant movement (breathing, bobbing, blinking). The one switch
 // for it. How often readings arrive is the app's side: SAMPLE_INTERVAL in
 // lib.rs.
 const IDLE_MOTION = true;
 // A mood that has just appeared stays at least this long, so readings near
 // a limit do not swap the face and the line every second.
 const MOOD_HOLD_MS = 5000;
-// What 칩이 says in each mood.
+// What the mascot says in each mood.
 const MOOD_TEXT = { calm: '한가해요', busy: '바빠요!', hot: '앗, 뜨거워!' };
 
 const $ = (id) => document.getElementById(id);
@@ -95,7 +96,11 @@ function renderMeter(percentEl, valueEl, fillEl, used, total) {
   return pct;
 }
 
-const mascot = mountMascot($('mascot'), { idleMotion: IDLE_MOTION });
+// Which mascot: opened in a browser, `?mascot=<name>` picks one.
+const mascot = mountMascot($('mascot'), {
+  idleMotion: IDLE_MOTION,
+  name: mascotOf(new URLSearchParams(location.search).get('mascot')),
+});
 // The mood on screen and when it appeared; it starts as the page is drawn.
 let shown = { mood: 'calm', since: -Infinity };
 
