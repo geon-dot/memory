@@ -90,14 +90,108 @@ pub fn top_programs(procs: &[ProcValue], top: usize) -> (Vec<Program>, Others) {
     let others = Others {
         programs: rest.len() as u32,
         count: rest.iter().map(|p| p.count).sum(),
-        value: rest.iter().map(|p| p.value).sum(),
+        value: rest.iter().map(|p| p.value).fold(0.0, |a, b| a + b),
     };
     (programs, others)
+}
+
+/// How many programs a list shows before "그 밖".
+pub const TOP_PROGRAMS: usize = 8;
+
+/// The payload of the `detail` event: one per-program list.
+///
+/// `value` units by `kind`:
+/// - `"cpu"`: percent of one core (100 = one core busy, like Activity
+///   Monitor's % CPU), so 230 means 2.3 cores. Can exceed 100.
+/// - `"gpu"`: percent of the whole GPU, 0..=100 per process.
+/// - `"mem"`: bytes.
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub struct DetailList {
+    /// `"cpu"`, `"gpu"` or `"mem"`: which list this is. A list of another
+    /// kind than the one the widget asked for last is a late one to drop.
+    pub kind: &'static str,
+    /// False when this machine cannot report this list at all (GPU per
+    /// program on an Intel Mac, or without GPU counters on Windows). The
+    /// lists are then empty and the numbers zero.
+    pub available: bool,
+    /// Largest first, at most `TOP_PROGRAMS`, only programs above zero.
+    pub programs: Vec<Program>,
+    /// Everything else added up.
+    pub others: Others,
+    /// Sum over every process counted (`programs` + `others`).
+    pub total: f64,
+    /// Processes counted.
+    pub processes: u32,
+    /// Processes left out because the OS let nothing about them be read
+    /// without administrator rights (not counted in `processes`).
+    pub unreadable: u32,
+}
+
+impl DetailList {
+    pub fn build(kind: Detail, procs: &[ProcValue], unreadable: u32) -> DetailList {
+        let (programs, others) = top_programs(procs, TOP_PROGRAMS);
+        let total = programs.iter().map(|p| p.value).fold(others.value, |a, b| a + b);
+        DetailList {
+            kind: kind.id(),
+            available: true,
+            programs,
+            others,
+            total,
+            processes: procs.len() as u32,
+            unreadable,
+        }
+    }
+
+    pub fn unavailable(kind: Detail) -> DetailList {
+        DetailList {
+            kind: kind.id(),
+            available: false,
+            programs: Vec::new(),
+            others: Others::default(),
+            total: 0.0,
+            processes: 0,
+            unreadable: 0,
+        }
+    }
+
+    /// One line for the diagnostics: `name×count value | ...`.
+    pub fn summary(&self) -> String {
+        if !self.available {
+            return format!("{}: unavailable", self.kind);
+        }
+        let shown = |v: f64| match self.kind {
+            "mem" => format!("{:.0}MiB", v / 1024.0 / 1024.0),
+            _ => format!("{v:.1}%"),
+        };
+        let mut parts: Vec<String> = self
+            .programs
+            .iter()
+            .map(|p| {
+                let rss = if p.rss { " (rss)" } else { "" };
+                format!("{}×{} {}{rss}", p.name, p.count, shown(p.value))
+            })
+            .collect();
+        parts.push(format!(
+            "others {} programs/{} procs {}",
+            self.others.programs,
+            self.others.count,
+            shown(self.others.value)
+        ));
+        format!(
+            "{}: {} | total {} over {} procs, {} unreadable",
+            self.kind,
+            parts.join(" | "),
+            shown(self.total),
+            self.processes,
+            self.unreadable
+        )
+    }
 }
 
 /// CPU time of one process as `ps` prints it (`time` column), in
 /// hundredths of a second. Accepts `S.cc`, `M:SS.cc`, `H:MM:SS.cc` and a
 /// leading `D-`.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // read through `ps` on macOS
 pub fn parse_cpu_time(text: &str) -> Option<u64> {
     let (days, clock) = match text.split_once('-') {
         Some((d, rest)) => (d.parse::<u64>().ok()?, rest),
@@ -131,6 +225,7 @@ pub fn parse_cpu_time(text: &str) -> Option<u64> {
 
 /// One line of `ps -axo pid=,time=,rss=,comm=`.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // read through `ps` on macOS
 pub struct PsRow {
     pub pid: u32,
     /// Total CPU time so far, hundredths of a second.
@@ -142,10 +237,12 @@ pub struct PsRow {
 
 /// Parses `ps -axo pid=,time=,rss=,comm=` output; lines that do not parse
 /// are skipped. `rss` is in KiB there.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // read through `ps` on macOS
 pub fn parse_ps(output: &str) -> Vec<PsRow> {
     output.lines().filter_map(parse_ps_line).collect()
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // read through `ps` on macOS
 fn parse_ps_line(line: &str) -> Option<PsRow> {
     // Columns are separated by runs of spaces; the command itself may hold
     // spaces, so it is everything after the third column.
@@ -170,6 +267,7 @@ fn parse_ps_line(line: &str) -> Option<PsRow> {
 /// `elapsed_secs` apart. A process missing from `before` started in between,
 /// so all of its time counts. A counter that went down (pid reused) counts
 /// from zero.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // read through `ps` on macOS
 pub fn cpu_percent(before: Option<u64>, now: u64, elapsed_secs: f64) -> f64 {
     if !(elapsed_secs > 0.0) {
         return 0.0;
@@ -260,6 +358,41 @@ mod tests {
     #[test]
     fn empty_is_empty() {
         assert_eq!(top_programs(&[], 8), (vec![], Others::default()));
+    }
+
+    #[test]
+    fn detail_list_totals_everything_and_counts_processes() {
+        let procs: Vec<ProcValue> =
+            (1..=10).map(|i| p(&format!("p{i:02}"), i as f64)).collect();
+        let list = DetailList::build(Detail::Cpu, &procs, 4);
+        assert_eq!(list.kind, "cpu");
+        assert!(list.available);
+        assert_eq!(list.programs.len(), TOP_PROGRAMS);
+        assert_eq!(list.total, 55.0);
+        assert_eq!(list.processes, 10);
+        assert_eq!(list.unreadable, 4);
+    }
+
+    #[test]
+    fn unavailable_list_is_empty_and_serializes_flat() {
+        let list = DetailList::unavailable(Detail::Gpu);
+        assert_eq!(list.summary(), "gpu: unavailable");
+        let json = serde_json::to_value(&list).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": "gpu", "available": false, "programs": [],
+                "others": {"programs": 0, "count": 0, "value": 0.0},
+                "total": 0.0, "processes": 0, "unreadable": 0
+            })
+        );
+    }
+
+    #[test]
+    fn summary_shows_memory_in_mib() {
+        let procs = vec![ProcValue { name: "x".into(), value: 2.0 * 1024.0 * 1024.0, rss: true }];
+        let s = DetailList::build(Detail::Mem, &procs, 0).summary();
+        assert!(s.starts_with("mem: x×1 2MiB (rss) | others 0 programs/0 procs 0MiB"), "{s}");
     }
 
     #[test]

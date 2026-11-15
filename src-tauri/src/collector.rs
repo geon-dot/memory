@@ -2,7 +2,7 @@
 
 use sysinfo::{DiskRefreshKind, Disks, System};
 
-use crate::gpu::GpuSampler;
+use crate::gpu::{GpuSampler, ProcGpu};
 use crate::snapshot::{clamp_pct, mean, pick_system_disk, DiskInfo, Snapshot};
 
 /// The disk list changes slowly and is the costliest thing to read, so it is
@@ -95,6 +95,17 @@ impl Collector {
             disk_used: 0,
             disk_total: 0,
         }
+    }
+
+    /// GPU use per process, for the GPU detail. Call right after `sample`
+    /// (on Windows both come from the same counter reading).
+    pub fn gpu_processes(&mut self) -> ProcGpu {
+        self.gpu.processes()
+    }
+
+    /// Drops the per-process GPU state once the GPU detail is closed.
+    pub fn forget_gpu_processes(&mut self) {
+        self.gpu.forget_processes();
     }
 
     fn read_disk(&mut self) -> (u64, u64) {

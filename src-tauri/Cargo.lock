@@ -3476,7 +3476,9 @@ version = "0.1.0"
 dependencies = [
  "core-foundation",
  "io-kit-sys",
+ "libc",
  "serde",
+ "serde_json",
  "sysinfo",
  "tauri",
  "tauri-build",
