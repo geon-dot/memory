@@ -17,6 +17,7 @@ macro_rules! diag {
 mod collector;
 mod gpu;
 mod mascot;
+mod procs;
 mod snapshot;
 mod tray;
 mod widget;
