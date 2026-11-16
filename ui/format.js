@@ -92,3 +92,59 @@ export function coreLayout(count) {
   }
   return { columns: 64, rows: Math.ceil(count / 64), gapX: 1, gapY: 1 };
 }
+
+/** CPU of a program: percent of one core, and how many cores that is. */
+export function cpuShare(v) {
+  return `${Math.round(v)}% (${(v / 100).toFixed(1)}코어)`;
+}
+
+/** GPU of a program, as a share of the whole GPU; one decimal while small. */
+export function gpuShare(v) {
+  return v < 9.95 ? `${v.toFixed(1)}%` : `${Math.round(v)}%`;
+}
+
+const DETAIL_VALUE = { cpu: cpuShare, gpu: gpuShare, mem: formatBytes };
+const DETAIL_NOTE = { cpu: '100% = 코어 1개', gpu: 'GPU 전체 = 100%' };
+
+/**
+ * What the detail panel shows for one `detail` event from the app (see
+ * `DetailList` in procs.rs): `state` is 'unavailable' (this machine cannot
+ * report the list), 'empty' (nothing is using it now) or 'list'. Each row
+ * has its text and `ratio`, the bar length against the top program (0..1);
+ * the last row, `rest: true`, is everything below the top programs.
+ */
+export function detailView(list) {
+  const value = DETAIL_VALUE[list.kind] ?? String;
+  if (!list.available) return { state: 'unavailable', total: '', rows: [], foot: '' };
+
+  const top = list.programs[0]?.value ?? 0;
+  const ratio = (v) => (top > 0 ? Number(Math.min(1, v / top).toFixed(2)) : 0);
+  const rows = list.programs.map((p) => ({
+    name: p.name,
+    note: p.count > 1 ? `×${p.count}` : '',
+    value: value(p.value) + (p.rss ? '*' : ''),
+    ratio: ratio(p.value),
+    rest: false,
+  }));
+  if (rows.length > 0 && list.others.programs > 0) {
+    rows.push({
+      name: `그 밖 ${list.others.programs}개`,
+      note: '',
+      value: value(list.others.value),
+      ratio: ratio(list.others.value),
+      rest: true,
+    });
+  }
+
+  const foot = [`프로세스 ${list.processes}개`];
+  if (list.unreadable > 0) foot.push(`읽지 못함 ${list.unreadable}개`);
+  if (list.programs.some((p) => p.rss)) foot.push('* RSS 기준');
+  if (DETAIL_NOTE[list.kind]) foot.push(DETAIL_NOTE[list.kind]);
+
+  return {
+    state: rows.length > 0 ? 'list' : 'empty',
+    total: value(list.total),
+    rows,
+    foot: foot.join(' · '),
+  };
+}

@@ -11,6 +11,9 @@ import {
   moodOf,
   holdMood,
   coreLayout,
+  cpuShare,
+  gpuShare,
+  detailView,
 } from './format.js';
 
 test('formatBytes', () => {
@@ -120,4 +123,93 @@ test('coreLayout: beyond 128 cores rows are added, 64 bars to a row', () => {
 
 test('coreLayout: no cores still gives a valid grid', () => {
   assert.deepEqual(coreLayout(0), { columns: 1, rows: 1, gapX: 3, gapY: 0 });
+});
+
+// --- per-program detail panel ---
+
+test('cpuShare shows percent of one core and how many cores that is', () => {
+  assert.equal(cpuShare(230), '230% (2.3코어)');
+  assert.equal(cpuShare(12.4), '12% (0.1코어)');
+  assert.equal(cpuShare(0), '0% (0.0코어)');
+});
+
+test('gpuShare keeps one decimal below ten percent', () => {
+  assert.equal(gpuShare(0.42), '0.4%');
+  assert.equal(gpuShare(9.96), '10%');
+  assert.equal(gpuShare(37.6), '38%');
+});
+
+const GBYTE = 1024 ** 3;
+const cpuList = {
+  kind: 'cpu',
+  available: true,
+  programs: [
+    { name: 'Xcode', count: 3, value: 230, rss: false },
+    { name: 'Safari', count: 1, value: 46, rss: false },
+  ],
+  others: { programs: 120, count: 400, value: 23 },
+  total: 299,
+  processes: 404,
+  unreadable: 0,
+};
+
+test('detailView lists programs largest first with a bar relative to the top one', () => {
+  const view = detailView(cpuList);
+  assert.equal(view.state, 'list');
+  assert.equal(view.total, '299% (3.0코어)');
+  assert.deepEqual(view.rows, [
+    { name: 'Xcode', note: '×3', value: '230% (2.3코어)', ratio: 1, rest: false },
+    { name: 'Safari', note: '', value: '46% (0.5코어)', ratio: 0.2, rest: false },
+    { name: '그 밖 120개', note: '', value: '23% (0.2코어)', ratio: 0.1, rest: true },
+  ]);
+  assert.equal(view.foot, '프로세스 404개 · 100% = 코어 1개');
+});
+
+test('detailView caps the bar of a large remainder and leaves out an empty one', () => {
+  const big = detailView({ ...cpuList, others: { programs: 5, count: 9, value: 900 } });
+  assert.equal(big.rows.at(-1).ratio, 1);
+  const none = detailView({ ...cpuList, others: { programs: 0, count: 0, value: 0 } });
+  assert.equal(none.rows.length, 2);
+});
+
+test('detailView formats memory in bytes and marks programs counted by RSS', () => {
+  const view = detailView({
+    kind: 'mem',
+    available: true,
+    programs: [
+      { name: 'Chrome', count: 12, value: 3.2 * GBYTE, rss: false },
+      { name: 'WindowServer', count: 1, value: 512 * 1024 ** 2, rss: true },
+    ],
+    others: { programs: 0, count: 0, value: 0 },
+    total: 3.7 * GBYTE,
+    processes: 13,
+    unreadable: 4,
+  });
+  assert.equal(view.total, '3.7 GB');
+  assert.equal(view.rows[0].value, '3.2 GB');
+  assert.equal(view.rows[1].value, '512 MB*');
+  assert.equal(view.foot, '프로세스 13개 · 읽지 못함 4개 · * RSS 기준');
+});
+
+test('detailView says so when the list cannot be read or nothing is in use', () => {
+  const base = { kind: 'gpu', programs: [], others: { programs: 0, count: 0, value: 0 }, total: 0, processes: 0, unreadable: 0 };
+  assert.equal(detailView({ ...base, available: false }).state, 'unavailable');
+  const idle = detailView({ ...base, available: true, others: { programs: 30, count: 40, value: 0 }, processes: 40 });
+  assert.equal(idle.state, 'empty');
+  assert.equal(idle.rows.length, 0);
+});
+
+test('detailView shows GPU as a share of the whole GPU', () => {
+  const view = detailView({
+    kind: 'gpu',
+    available: true,
+    programs: [{ name: 'WindowServer', count: 1, value: 6.2, rss: false }],
+    others: { programs: 0, count: 0, value: 0 },
+    total: 6.2,
+    processes: 1,
+    unreadable: 0,
+  });
+  assert.equal(view.total, '6.2%');
+  assert.equal(view.rows[0].value, '6.2%');
+  assert.equal(view.foot, '프로세스 1개 · GPU 전체 = 100%');
 });

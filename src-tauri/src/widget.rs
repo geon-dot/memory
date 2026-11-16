@@ -10,13 +10,19 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Emitter, LogicalPosition, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow, WebviewWindowBuilder,
+};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use crate::mascot::Mascot;
 use crate::procs::Detail;
 
 pub const WINDOW_LABEL: &str = "main";
+
+/// How much wider the window is while the per-program panel is open, in
+/// logical px. The panel in `ui/style.css` fills exactly this.
+pub const PANEL_WIDTH: f64 = 250.0;
 
 /// What a new widget window takes over from the last one.
 pub struct WidgetState {
@@ -33,6 +39,9 @@ pub struct WidgetState {
     /// `mascot_file`, and handed to each new widget.
     mascot: Mutex<Mascot>,
     mascot_file: Option<PathBuf>,
+    /// `Some` while the per-program panel is open: how far left the window
+    /// was moved to keep the panel on the screen (0 when it fitted).
+    panel: Mutex<Option<f64>>,
 }
 
 impl WidgetState {
@@ -53,6 +62,7 @@ impl WidgetState {
             pin_file,
             mascot: Mutex::new(Mascot::from_saved(saved.as_deref())),
             mascot_file,
+            panel: Mutex::new(None),
         }
     }
 }
@@ -241,13 +251,73 @@ pub fn toggle(app: &AppHandle) {
     }
 }
 
+/// How far left a window at `x` has to move for `width` to end inside a
+/// screen that spans `screen_x..screen_x + screen_width`: nothing when it
+/// fits, and never past the screen's left edge.
+fn panel_shift(x: f64, width: f64, screen_x: f64, screen_width: f64) -> f64 {
+    let over = x + width - (screen_x + screen_width);
+    over.clamp(0.0, (x - screen_x).max(0.0))
+}
+
+/// Opens or closes the per-program panel: the window grows to the right by
+/// `PANEL_WIDTH` and shrinks back. Near the right edge of the screen it
+/// moves left first so the panel stays visible, and returns on closing.
+pub fn set_panel(window: &WebviewWindow, open: bool) -> tauri::Result<()> {
+    let Some(state) = window.try_state::<WidgetState>() else {
+        return Ok(());
+    };
+    let mut panel = state.panel.lock().unwrap();
+    if open == panel.is_some() {
+        return Ok(());
+    }
+    let config = window.app_handle().config();
+    let Some(base) = config.app.windows.iter().find(|w| w.label == WINDOW_LABEL) else {
+        return Ok(());
+    };
+    let scale = window.scale_factor()?;
+    let pos = window.outer_position()?.to_logical::<f64>(scale);
+    if open {
+        let width = base.width + PANEL_WIDTH;
+        let shift = match window.current_monitor()? {
+            Some(m) => {
+                let screen_x = m.position().to_logical::<f64>(m.scale_factor()).x;
+                let screen_width = m.size().to_logical::<f64>(m.scale_factor()).width;
+                panel_shift(pos.x, width, screen_x, screen_width)
+            }
+            None => 0.0,
+        };
+        if shift > 0.0 {
+            window.set_position(LogicalPosition::new(pos.x - shift, pos.y))?;
+        }
+        window.set_size(LogicalSize::new(width, base.height))?;
+        *panel = Some(shift);
+    } else {
+        let shift = panel.take().unwrap_or(0.0);
+        window.set_size(LogicalSize::new(base.width, base.height))?;
+        if shift > 0.0 {
+            window.set_position(LogicalPosition::new(pos.x + shift, pos.y))?;
+        }
+    }
+    diag!("panel: open={open}");
+    Ok(())
+}
+
+/// The widget window is gone; the next one starts without the panel.
+pub fn panel_closed(app: &AppHandle) {
+    if let Some(state) = app.try_state::<WidgetState>() {
+        *state.panel.lock().unwrap() = None;
+    }
+}
+
 /// Records where the widget is, for the next time it opens.
 pub fn remember_position(window: &WebviewWindow) {
     let (Ok(pos), Ok(scale)) = (window.outer_position(), window.scale_factor()) else {
         return;
     };
-    let pos = pos.to_logical::<f64>(scale);
+    let mut pos = pos.to_logical::<f64>(scale);
     if let Some(state) = window.try_state::<WidgetState>() {
+        // Where it would be with the panel closed, as it reopens that way.
+        pos.x += state.panel.lock().unwrap().unwrap_or(0.0);
         *state.position.lock().unwrap() = Some(pos);
         diag!("widget: remembered position {},{}", pos.x, pos.y);
     }
@@ -334,6 +404,25 @@ mod tests {
         assert_eq!(second_launch_action(&off, true), Action::Detail(Detail::Off));
         let odd = args(&["app", "--detail=disk"]);
         assert_eq!(second_launch_action(&odd, true), Action::Notice);
+    }
+
+    #[test]
+    fn panel_fits_without_moving_when_there_is_room() {
+        assert_eq!(panel_shift(100.0, 550.0, 0.0, 1440.0), 0.0);
+        assert_eq!(panel_shift(890.0, 550.0, 0.0, 1440.0), 0.0);
+    }
+
+    #[test]
+    fn panel_near_the_right_edge_moves_the_window_left() {
+        assert_eq!(panel_shift(1100.0, 550.0, 0.0, 1440.0), 210.0);
+        // A second screen to the right starts at its own x.
+        assert_eq!(panel_shift(2700.0, 550.0, 1440.0, 1440.0), 370.0);
+    }
+
+    #[test]
+    fn panel_never_moves_the_window_past_the_left_edge() {
+        assert_eq!(panel_shift(100.0, 550.0, 0.0, 400.0), 100.0);
+        assert_eq!(panel_shift(-20.0, 550.0, 0.0, 400.0), 0.0);
     }
 
     #[test]
