@@ -246,6 +246,10 @@ CPU·GPU·메모리를 어느 프로그램이 얼마나 쓰는지 보여 주는 
 닫을 때 제자리로 돌아옵니다. 위에서 8개 프로그램과 "그 밖"을 보여 주고, CPU는 `230% (2.3코어)`처럼 코어 하나를 100%로 셉니다
 (어느 코어에서 도는지는 OS가 알려 주지 않아 표시하지 않습니다). `*`가 붙은 메모리 값은 RSS 기준입니다.
 
+![프로그램별 목록: CPU, GPU, MEM 카드를 눌렀을 때, 밝은 테마와 어두운 테마](docs/design/detail.png)
+
+(위 그림도 앱 창을 찍은 것이 아니라, 같은 `ui/` 파일에 가짜 목록(`ui/demo.js`)을 넣어 브라우저로 찍은 것입니다.)
+
 ### 화면에서 쓰는 법 (웹뷰 ↔ 앱)
 
 - 열기·바꾸기·닫기: `invoke("set_detail", { kind })`, `kind`는 `"cpu"`, `"gpu"`, `"mem"`, `"off"` 중 하나.
@@ -388,6 +392,7 @@ GPU는 창 없이 Metal 계산만 정해진 비율로 시키는 작은 시험 �
 | `scripts/build-icons.sh` | 원본 그림에서 아이콘 파일 만들기 (macOS) |
 | `scripts/measure-memory.sh` | 실행 중인 앱의 메모리 측정 (macOS) |
 | `scripts/measure-cpu.sh` | 실행 중인 앱의 평균 CPU 측정 (macOS) |
+| `docs/design/detail.png` | 프로그램별 목록 화면 그림 |
 | `docs/design/reference-notes.md` | 화면 디자인의 출처와 수치 |
 
 설계와 구현 계획은 `docs/superpowers/`에 있습니다.
