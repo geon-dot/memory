@@ -14,7 +14,7 @@ use crate::snapshot::clamp_pct;
 /// Instance names look like `pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3D`,
 /// where `luid_..._phys` identifies the adapter. Names without an `engtype_`
 /// part are ignored; `None` means nothing usable was reported.
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))] // used by PdhGpu
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))] // used by GpuSampler
 pub fn aggregate_engines(samples: &[(String, f64)]) -> Option<f32> {
     let mut per_engine: HashMap<(&str, &str), f64> = HashMap::new();
     for (name, value) in samples {
@@ -31,6 +31,43 @@ pub fn aggregate_engines(samples: &[(String, f64)]) -> Option<f32> {
         .copied()
         .reduce(f64::max)
         .map(|v| clamp_pct(v as f32))
+}
+
+/// Per-process GPU utilization from the same counter instances, the way
+/// Task Manager's per-process GPU column reads them: the instances of one
+/// process (`pid_N_...`) are summed per adapter and engine type, and the
+/// busiest adapter-and-type pair is that process's figure, 0.0..=100.0.
+/// Instances without a `pid_` or `engtype_` part are ignored.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))] // used by GpuSampler
+pub fn per_process_engines(samples: &[(String, f64)]) -> Vec<(u32, f32)> {
+    let mut per_engine: HashMap<(u32, &str, &str), f64> = HashMap::new();
+    for (name, value) in samples {
+        let Some((rest, engine_type)) = name.rsplit_once("engtype_") else {
+            continue;
+        };
+        let Some(pid) = pid_of(rest) else {
+            continue;
+        };
+        if !value.is_finite() {
+            continue;
+        }
+        *per_engine.entry((pid, adapter_of(rest), engine_type)).or_insert(0.0) += value;
+    }
+    let mut per_pid: HashMap<u32, f64> = HashMap::new();
+    for ((pid, _, _), v) in per_engine {
+        let best = per_pid.entry(pid).or_insert(0.0);
+        *best = best.max(v);
+    }
+    let mut out: Vec<(u32, f32)> =
+        per_pid.into_iter().map(|(pid, v)| (pid, clamp_pct(v as f32))).collect();
+    out.sort_by_key(|(pid, _)| *pid);
+    out
+}
+
+/// The process id at the start of an instance name (`pid_1234_...`).
+fn pid_of(name: &str) -> Option<u32> {
+    let rest = name.strip_prefix("pid_")?;
+    rest.split('_').next()?.parse().ok()
 }
 
 /// The adapter id inside an instance name: the text between `luid_` and
@@ -53,8 +90,6 @@ mod pdh {
         PDH_CSTATUS_VALID_DATA, PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER,
         PDH_HQUERY, PDH_MORE_DATA,
     };
-
-    use super::aggregate_engines;
 
     const ERROR_SUCCESS: u32 = 0;
 
@@ -93,7 +128,9 @@ mod pdh {
             Some(this)
         }
 
-        pub fn sample(&mut self) -> Option<f32> {
+        /// Every `GPU Engine` instance and its utilization since the last
+        /// read, or `None` when the counters could not be read.
+        pub fn read(&mut self) -> Option<Vec<(String, f64)>> {
             // SAFETY: the query handle is open.
             if unsafe { PdhCollectQueryData(self.query) } != ERROR_SUCCESS {
                 return None;
@@ -153,7 +190,7 @@ mod pdh {
                     samples.push((name, value));
                 }
             }
-            aggregate_engines(&samples)
+            Some(samples)
         }
     }
 
@@ -198,6 +235,36 @@ mod tests {
             ("b_engtype_3D".to_string(), 70.0),
         ];
         assert_eq!(aggregate_engines(&s), Some(100.0));
+    }
+
+    #[test]
+    fn per_process_sums_engines_of_one_type_and_takes_the_busiest() {
+        let s = vec![
+            // pid 1: two 3D engines on adapter A add up; video decode is less.
+            ("pid_1_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 20.0),
+            ("pid_1_luid_0x0_0xA_phys_0_eng_1_engtype_3D".to_string(), 15.0),
+            ("pid_1_luid_0x0_0xA_phys_0_eng_2_engtype_VideoDecode".to_string(), 30.0),
+            // pid 2: on two adapters, which are not added together.
+            ("pid_2_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 10.0),
+            ("pid_2_luid_0x0_0xB_phys_0_eng_0_engtype_3D".to_string(), 12.0),
+            // pid 3: idle.
+            ("pid_3_luid_0x0_0xA_phys_0_eng_0_engtype_Copy".to_string(), 0.0),
+        ];
+        assert_eq!(per_process_engines(&s), vec![(1, 35.0), (2, 12.0), (3, 0.0)]);
+    }
+
+    #[test]
+    fn per_process_skips_names_without_a_pid_or_engine_and_clamps() {
+        let s = vec![
+            ("luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 50.0),
+            ("pid_x_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 50.0),
+            ("pid_7_luid_0x0_0xA_phys_0_eng_0".to_string(), 50.0),
+            ("pid_8_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), 80.0),
+            ("pid_8_luid_0x0_0xA_phys_0_eng_1_engtype_3D".to_string(), 70.0),
+            ("pid_9_luid_0x0_0xA_phys_0_eng_0_engtype_3D".to_string(), f64::NAN),
+        ];
+        assert_eq!(per_process_engines(&s), vec![(8, 100.0)]);
+        assert_eq!(per_process_engines(&[]), vec![]);
     }
 
     #[test]

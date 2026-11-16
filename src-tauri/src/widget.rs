@@ -14,6 +14,7 @@ use tauri::{AppHandle, Emitter, LogicalPosition, Manager, WebviewWindow, Webview
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use crate::mascot::Mascot;
+use crate::procs::Detail;
 
 pub const WINDOW_LABEL: &str = "main";
 
@@ -130,11 +131,13 @@ pub enum Action {
     Notice,
     /// Choose a mascot, as the tray menu does.
     Mascot(Mascot),
+    /// Show a per-program list (or none), as the widget's `set_detail` does.
+    Detail(Detail),
 }
 
 /// Starting the app again does not start a second copy; the running one says
 /// it is already running. With diagnostics on, `--hide`, `--toggle`,
-/// `--show` and `--mascot=<id>` instead drive the widget the way the tray
+/// `--show`, `--mascot=<id>` and `--detail=cpu|gpu|mem|off` instead drive the widget the way the tray
 /// does, so each state can be measured and checked without clicking.
 pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
     if !diagnostics {
@@ -149,7 +152,13 @@ pub fn second_launch_action(args: &[String], diagnostics: bool) -> Action {
             other => other
                 .strip_prefix("--mascot=")
                 .and_then(Mascot::from_id)
-                .map(Action::Mascot),
+                .map(Action::Mascot)
+                .or_else(|| {
+                    other
+                        .strip_prefix("--detail=")
+                        .and_then(Detail::from_id)
+                        .map(Action::Detail)
+                }),
         })
         .unwrap_or(Action::Notice)
 }
@@ -187,6 +196,7 @@ pub fn run_from_any_thread(app: &AppHandle, action: Action) {
         Action::Toggle => toggle(&handle),
         Action::Notice => notice(&handle),
         Action::Mascot(mascot) => set_mascot(&handle, mascot),
+        Action::Detail(detail) => crate::set_detail_kind(detail),
     });
 }
 
@@ -313,6 +323,17 @@ mod tests {
         );
         let nobody = args(&["system-monitor", "--mascot=nobody"]);
         assert_eq!(second_launch_action(&nobody, true), Action::Notice);
+    }
+
+    #[test]
+    fn detail_flag_chooses_a_list_only_with_diagnostics_on() {
+        let cpu = args(&["app", "--detail=cpu"]);
+        assert_eq!(second_launch_action(&cpu, false), Action::Notice);
+        assert_eq!(second_launch_action(&cpu, true), Action::Detail(Detail::Cpu));
+        let off = args(&["app", "--detail=off"]);
+        assert_eq!(second_launch_action(&off, true), Action::Detail(Detail::Off));
+        let odd = args(&["app", "--detail=disk"]);
+        assert_eq!(second_launch_action(&odd, true), Action::Notice);
     }
 
     #[test]

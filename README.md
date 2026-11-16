@@ -63,7 +63,8 @@ Mac 메뉴 막대 / Windows 트레이에 상주하면서 CPU, GPU, 메모리, �
 - 이미 실행 중일 때 다시 실행하면 하나 더 뜨지 않고 위젯이 열리면서 "이미 실행 중" 알림이 뜹니다
 - 관리자 권한이 필요 없습니다
 
-첫 버전에 없는 것: 프로세스별 목록, 온도·팬 속도, 경고 알림, 기록 저장.
+첫 버전에 없는 것: 온도·팬 속도, 경고 알림, 기록 저장. 프로그램별 CPU·GPU·메모리 목록은 앱이 수집해 보내는 데까지 들어가 있고,
+위젯 화면에는 아직 없습니다(아래 "프로그램별 사용량").
 
 ## 내려받아 쓰기
 
@@ -154,6 +155,8 @@ scripts/measure-memory.sh --pid <pid> --settle 60   # 60초 기다린 뒤 측정
 - 클릭 없이 상태를 바꾸려면 앱을 `SYSTEM_MONITOR_DIAG=1`로 띄운 뒤
   `".../Contents/MacOS/system-monitor" --hide` / `--show` / `--toggle`을 실행합니다.
   `--mascot=<이름>`(`chiikawa`, `hachiware`, `usagi`, `chip`)은 트레이 메뉴에서 마스코트를 고른 것과 같습니다.
+  `--detail=<종류>`(`cpu`, `gpu`, `mem`, `off`)는 위젯이 프로그램별 목록을 연 것과 같고, 읽은 목록과 읽는 데 든 시간이 찍힙니다
+  (위젯이 열려 있을 때만 읽습니다. 아래 "프로그램별 사용량").
   이 진단 모드에서는 창 생성·해제와 메뉴 막대 갱신, 위젯이 지금 보여 주는 것(마스코트·상태·그림 파일·움직임 이름)이 stderr에 찍힙니다. 진단 모드가 아니면 이 인자들은 무시되고, 다시 실행하면 위젯이 열리고 "이미 실행 중" 알림이 뜹니다.
 
 ### 변경 전후 (Apple Silicon Mac, macOS 26, 릴리스 빌드)
@@ -233,18 +236,144 @@ scripts/measure-cpu.sh --app "src-tauri/target/release/bundle/macos/먼작귀모
 - 잴 때 기기는 다른 작업으로 CPU 16–30%, 메모리 84–89%를 쓰고 있었습니다. 한가한 기기에서는 더 낮을 수 있습니다.
 - Windows에서는 재지 않았습니다.
 
+## 프로그램별 사용량
+
+CPU·GPU·메모리를 어느 프로그램이 얼마나 쓰는지 보여 주는 목록입니다. 앱은 위젯이 **목록을 열어 달라고 할 때만**,
+**그 한 종류만** 프로세스를 읽습니다. 목록이 닫혀 있거나 위젯이 닫혀 있으면 아무것도 읽지 않습니다.
+
+### 화면에서 쓰는 법 (웹뷰 ↔ 앱)
+
+- 열기·바꾸기·닫기: `invoke("set_detail", { kind })`, `kind`는 `"cpu"`, `"gpu"`, `"mem"`, `"off"` 중 하나.
+  다른 값이면 오류를 돌려줍니다. 위젯 창이 해제되면(✕, 트레이) 앱이 알아서 `"off"`로 돌리고, 새로 열린 위젯은 목록이 닫힌 상태로 시작합니다.
+- 결과: 이벤트 `detail`. 주기는 GPU 1초, CPU·메모리 2초(아래 "부하").
+  - CPU·GPU는 비율이라 두 번 읽어야 해서, 연 뒤 첫 이벤트는 약 1초 뒤에 옵니다. 메모리는 바로 옵니다. 그 사이에는 "재는 중"으로 보여 주면 됩니다.
+  - 목록을 바꾼 직후에는 앞 종류의 이벤트가 하나 늦게 올 수 있으니 `kind`가 지금 연 것과 다르면 버립니다.
+
+```jsonc
+{
+  "kind": "cpu",            // "cpu" | "gpu" | "mem"
+  "available": true,        // false: 이 기기에서는 이 목록을 읽을 수 없음 (아래). 그때 programs는 [], 숫자는 0
+  "programs": [             // 큰 순서, 최대 8개, 값이 0보다 큰 것만 (같은 값이면 이름 순)
+    { "name": "Google Chrome Helper (Renderer)", "count": 12, "value": 34.5, "rss": false }
+  ],
+  "others": { "programs": 431, "count": 690, "value": 60.4 },  // 8개 밖의 프로그램 수, 프로세스 수, 값의 합
+  "total": 323.6,           // 모든 프로세스 값의 합 (programs + others)
+  "processes": 731,         // 센 프로세스 수
+  "unreadable": 4           // 아무것도 읽을 수 없어 빼놓은 프로세스 수 (processes에 들어 있지 않음)
+}
+```
+
+| `kind` | `value`의 단위 | 뜻 |
+|--------|----------------|----|
+| `cpu` | 코어 하나 = 100 (%) | 활동 상태 보기의 "% CPU"와 같은 기준. 230이면 코어 2.3개만큼 → "230% (2.3코어)". 100을 넘을 수 있음 |
+| `gpu` | GPU 전체 = 100 (%) | 그 프로그램이 GPU를 쓴 시간 ÷ 지난 시간. 프로그램마다 0–100 |
+| `mem` | 바이트 | macOS는 활동 상태 보기의 "메모리"(물리 footprint). `rss: true`면 그 프로그램의 일부 또는 전부를 RSS로 셈(아래) |
+
+- **묶기**: 실행 파일 이름이 같은 프로세스는 하나로 합치고 `count`에 개수를 줍니다(예: "Google Chrome Helper (Renderer)" 12개).
+  이름은 실행 파일 이름 그대로입니다(macOS는 경로의 마지막 부분, Windows는 `chrome.exe`처럼 확장자 포함).
+- **GPU를 못 읽을 때**: `{"kind":"gpu","available":false,"programs":[],...}`가 옵니다. Intel Mac(아래), GPU 성능 카운터가 없는 Windows가 그렇습니다.
+  전체 GPU 사용률(`snapshot.gpu`)과는 별개라, 전체 값은 보이는데 프로그램별은 없을 수 있습니다.
+- 모양은 `src-tauri/src/procs.rs`의 `DetailList`, 명령은 `src-tauri/src/lib.rs`의 `set_detail`에도 적혀 있습니다.
+
+### 숫자의 출처와 한계
+
+**macOS**
+
+- CPU: `/bin/ps -axo pid=,time=,rss=,comm=`의 누적 CPU 시간이 두 번 읽는 사이에 늘어난 만큼 ÷ 지난 시간입니다. `ps`는 시스템에 원래 있는
+  set-uid 도구라, 이 앱이 관리자 권한 없이도 WindowServer·mds 같은 root 소유 프로세스까지 읽습니다(앱이 직접 읽으면 약 200개가 0으로 나옵니다).
+  `ps`의 `%cpu` 열은 감쇠 평균이라 쓰지 않습니다. 같은 시각 `top`과 상위 다섯 개의 순서와 크기가 비슷했습니다(아래 "확인한 것").
+- 메모리: 이 사용자의 프로세스는 `proc_pid_rusage`의 `ri_phys_footprint`(활동 상태 보기의 "메모리"와 같은 값)를 씁니다. 다른 사용자(root 등)의
+  프로세스는 이 값을 관리자 권한 없이 읽을 수 없어 `ps`의 RSS로 대신하고 `rss: true`로 표시합니다. RSS는 footprint와 다릅니다. 특히
+  WindowServer처럼 GPU 메모리를 많이 쓰는 프로세스는 RSS가 훨씬 작게 나옵니다(예: top의 메모리 636 MB, RSS 약 55 MB).
+- 빠지는 것: `kernel_task`(pid 0)는 `ps`에 나오지 않아 CPU·메모리 목록에 없습니다. `top`으로는 읽히지만 한 번에 CPU 약 0.65초가 들어
+  쓰지 않습니다. 보안 에이전트처럼 `ps`로도 아무것도 안 읽히는 보호된 프로세스는 `unreadable`로 셉니다(이 기기에서 4개).
+- GPU: Apple Silicon에서는 프로세스가 GPU를 열 때마다 IORegistry의 가속기(`AGXAccelerator…`) 아래에 사용자 클라이언트(`AGXDeviceUserClient`)가
+  생기고, 여기에 `IOUserClientCreator`(`"pid 176, WindowServer"`)와 명령 큐별 `AppUsage.accumulatedGPUTime`(지금까지 쓴 GPU 시간, 나노초)이
+  있습니다. 관리자 권한 없이 읽히는 공개 IOKit 값입니다(`ioreg -r -c AGXDeviceUserClient -l -w0`로도 보임). 클라이언트별로 1초 사이에 늘어난 시간을 더해
+  지난 시간으로 나눕니다. 나노초 단위는 같은 항목의 `lastSubmittedTime`이 부팅 후 경과 시간과 맞는 것으로 확인했습니다.
+  - 정확도: GPU 일을 정해진 비율로 시키는 시험 프로그램으로 대조했습니다(아래). 그 프로그램은 1위로 올라오고, 목록 합계는 전체 GPU 사용률과
+    부하가 높을 때 1–3%p, 중간일 때 10–15%p 낮게 나옵니다. 전체 사용률(`Device Utilization %`)은 GPU가 바쁜 시간 전부를 세고 목록은 프로그램이 낸
+    일의 실행 시간만 세서 생기는 차이로 보입니다. 1초 사이에 생겼다 닫힌 클라이언트의 시간은 셀 수 없어 빠집니다.
+  - Intel Mac 등 클라이언트에 `AppUsage`가 없는 기기에서는 `available: false`입니다(Intel Mac에서는 확인하지 못했습니다).
+- 이름: CPU·메모리는 `ps`의 실행 파일 경로, GPU는 `proc_pidpath`로 같은 실행 파일 이름을 씁니다. 그래서 세 목록의 이름이 같습니다.
+
+**Windows** (실제 Windows 기기에서 실행해 보지 않았습니다. 빌드는 Windows 대상 타입 검사만, 계산은 순수 함수 테스트로 확인)
+
+- CPU·메모리: `sysinfo`의 프로세스별 CPU(코어 하나 = 100)와 working set. 다른 사용자의 보호된 프로세스처럼 메모리가 0으로 읽히는 것은 `unreadable`로 셉니다.
+- GPU: 전체 GPU에 쓰는 `\GPU Engine(*)\Utilization Percentage` 카운터를 같은 한 번의 읽기에서 인스턴스 이름의 `pid_N`으로 나눕니다.
+  프로세스마다 어댑터·엔진 종류(3D, VideoDecode …)별로 더하고 그중 가장 바쁜 값을 씁니다(작업 관리자의 프로세스별 GPU 열과 같은 규칙,
+  전체 GPU 값과 같은 어댑터·엔진 규칙). 카운터가 없으면 `available: false`.
+
+### 부하
+
+후보 릴리스 빌드(Apple Silicon Mac, macOS 26), 위젯이 열린 상태입니다. `ps` 실행분은 `scripts/measure-cpu.sh`에 잡히지 않아(앱이 띄웠다 바로 끝나는
+자식 프로세스) 진단 로그의 `child cpu`를 더해 따로 적었습니다.
+
+| 목록 | 한 번 읽는 데 | 주기 | 늘어나는 CPU |
+|------|---------------|------|--------------|
+| 닫힘(`off`) | 읽지 않음 | | 0 |
+| CPU·메모리 | 40–55 ms, 그중 `ps`가 CPU 33–45 ms | 2초 | `ps` 약 1.9% (코어 하나 기준), 앱 본체는 측정 흔들림 안 |
+| GPU | 1–3 ms (IORegistry만 읽음) | 1초 | 측정 흔들림 안 |
+
+- CPU·메모리를 1초마다 읽으면 `ps`만으로 약 3.9%가 되어, 위젯 전체(약 4–5%)에 맞먹으므로 2초로 정했습니다. 주기는 `lib.rs`의 `detail_every`입니다.
+- 메모리는 목록을 열어도 그대로였습니다(합계 178–179 MiB). 목록을 읽는 부분은 목록이 열릴 때 만들고 닫힐 때 버립니다.
+
+목록이 닫혀 있을 때(`off`)는 변경 전과 같습니다. 같은 날 변경 전(`main`) 빌드와 번갈아 잰 footprint 합계와 평균 CPU입니다.
+
+| 상태 | 변경 전 (`main`) | 변경 후, 목록 닫힘 |
+|------|------------------|--------------------|
+| 위젯 열림, 메모리 | 178.3 MiB | 178.2, 180.4 MiB |
+| 위젯 열림, CPU | (README 앞쪽 값 4.4–5.5%) | 3.05, 3.59% |
+| 위젯 닫힘, 메모리 (닫고 60초 뒤) | 29.3, 31.9 MiB | 28.0, 30.9 MiB |
+| 위젯 닫힘, CPU | 1.32, 1.33% | 1.13, 1.23% |
+
+- 목록이 닫힌 동안과 위젯이 닫힌 동안의 진단 로그에는 목록을 읽은 줄이 하나도 없습니다. 목록을 연 채 위젯을 닫으면 목록도 꺼지고,
+  위젯이 닫힌 동안 목록을 요청해도 다음 1초 안에 꺼져 읽지 않습니다.
+- 변경 전 빌드의 "위젯 열림" CPU는 이번에 재지 못했습니다. 재는 도중 측정 스크립트가 닫기 전에 위젯 창이 닫혀(진단 로그에 `window destroyed`)
+  값이 나오지 않았습니다(무엇이 닫았는지는 확인하지 않았습니다). 그래서 앞쪽 "CPU" 표의 값과 비교했습니다.
+
+### 확인한 것 (macOS)
+
+같은 순간에 진단 로그와 `top -l 3 -s 2`를 나란히 놓고 비교했습니다. Spotlight 색인 중이라 시스템 프로세스가 바쁜 때였습니다.
+
+| CPU (코어 하나 = 100) | 목록 | top |
+|-----------------------|------|-----|
+| mds_stores | 84.8 | 68.1 |
+| mds | 35.0 | 32.2 |
+| Google Chrome Helper (Renderer) | 26.8 (35개 합) | 30.6 (1개) |
+| mobileassetd | 25.9 | 28.1 |
+| XProtectRemediatorMRTv3 | 22.0 | 23.0 |
+| kernel_task | 없음 | 15.7 |
+
+| 메모리 (MiB) | 목록 | top (같은 이름 합) |
+|--------------|------|--------------------|
+| idea | 3998 | 3998 |
+| Figma Helper (Renderer) ×9 | 3649 | 3653 |
+| cmux | 1642 | 1642 |
+| Figma Helper ×3 | 1204 | 1203 |
+
+GPU는 창 없이 Metal 계산만 정해진 비율로 시키는 작은 시험 프로그램(`gpuload`, 저장소 밖, 화면에 아무것도 그리지 않음)으로 확인했습니다.
+
+| 시험 부하 | 시험 프로그램이 잰 자기 GPU 시간 | 목록의 그 프로그램 | 목록 합계 | 전체 GPU (`Device Utilization %`) |
+|-----------|-------------------------------|--------------------|-----------|-----------------------------------|
+| 없음 | | | 1.0–1.1% (cmux 0.8–0.9% 1위) | |
+| 50% | 47% | 37–42% (1위) | 41–44% | 54–59% |
+| 90% | 84% | 80–82% (1위) | 82–85% | 83–86% |
+
 ## 구조
 
 | 경로 | 역할 |
 |------|------|
 | `src-tauri/src/snapshot.rs` | 한 번의 측정값(`Snapshot`)과 순수 계산 |
 | `src-tauri/src/collector.rs` | CPU·메모리·디스크 수집 (`sysinfo`) |
-| `src-tauri/src/gpu/macos.rs` | Mac GPU 사용률 (IOKit `IOAccelerator`) |
-| `src-tauri/src/gpu/windows.rs` | Windows GPU 사용률 (성능 카운터 `GPU Engine`) |
+| `src-tauri/src/gpu/macos.rs` | Mac GPU 사용률 (IOKit `IOAccelerator`)과 프로그램별 GPU 시간(가속기의 사용자 클라이언트) |
+| `src-tauri/src/gpu/windows.rs` | Windows GPU 사용률과 프로그램별 GPU (성능 카운터 `GPU Engine`) |
 | `src-tauri/src/tray.rs` | 트레이 아이콘, 메뉴(마스코트 고르기 포함), 요약 표시 |
 | `src-tauri/src/mascot.rs` | 고를 수 있는 마스코트 목록, 저장된 선택 읽기(없으면 치이카와) |
 | `src-tauri/src/widget.rs` | 위젯 창 열기·닫기(닫으면 해제), 위치·📌·마스코트 기억 |
-| `src-tauri/src/lib.rs` | 앱 조립, 1초 주기 샘플러 스레드 |
+| `src-tauri/src/lib.rs` | 앱 조립, 1초 주기 샘플러 스레드, 프로그램별 목록 켜고 끄기(`set_detail`) |
+| `src-tauri/src/procs.rs` | 프로그램별 목록의 모양(`DetailList`)과 순수 계산 (같은 이름 묶기, 상위 8개, `ps` 출력 읽기, CPU 비율) |
+| `src-tauri/src/procdata.rs` | 프로그램별 CPU·메모리 읽기(macOS `ps`·footprint, Windows `sysinfo`)와 GPU 목록의 이름 찾기 |
 | `ui/` | 위젯 화면 (프레임워크 없는 HTML/CSS/JS). 마스코트는 `ui/mascot.js`가 그리고(칩이는 SVG, 나머지는 그림), 움직임은 `ui/mascot.css` |
 | `ui/mascots.js` | 마스코트 이름, 기본값, 상태별 그림 파일 (순수 계산) |
 | `ui/mascot/<이름>/` | 그림 마스코트의 상태별 그림(`idle.png`, `busy.png`, `hot.png`, 144px). 팬이 만든 2차 창작물 |
