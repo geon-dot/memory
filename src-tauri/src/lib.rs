@@ -63,10 +63,11 @@ fn set_detail_kind(kind: Detail) {
 /// reads only that kind and sends it as the `detail` event; see
 /// `procs::DetailList` for its shape. Closing the widget turns it off.
 #[tauri::command]
-fn set_detail(kind: String) -> Result<(), String> {
+fn set_detail(window: tauri::WebviewWindow, kind: String) -> Result<(), String> {
     let kind = Detail::from_id(&kind).ok_or_else(|| format!("unknown detail {kind:?}"))?;
     set_detail_kind(kind);
-    Ok(())
+    // The list is drawn in a panel to the right of the widget.
+    widget::set_panel(&window, kind != Detail::Off).map_err(|e| e.to_string())
 }
 
 /// Keeps the widget window above other windows, or lets it go behind them.
@@ -241,6 +242,7 @@ pub fn run() {
                 diag!("widget: window destroyed");
                 // The next widget starts with no list open.
                 set_detail_kind(Detail::Off);
+                widget::panel_closed(window.app_handle());
             }
             _ => {}
         })

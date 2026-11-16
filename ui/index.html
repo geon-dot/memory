@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="mascot.css" />
   </head>
   <body>
+    <div class="widget">
     <header class="top" data-tauri-drag-region>
       <svg class="dots" aria-hidden="true">
         <circle cx="12" cy="12" r="3.5" /><circle cx="46" cy="12" r="3.5" /><circle cx="80" cy="12" r="3.5" /><circle cx="114" cy="12" r="3.5" /><circle cx="148" cy="12" r="3.5" /><circle cx="182" cy="12" r="3.5" /><circle cx="216" cy="12" r="3.5" /><circle cx="250" cy="12" r="3.5" /><circle cx="284" cy="12" r="3.5" />
@@ -31,7 +32,7 @@
     </header>
 
     <main>
-      <section class="card cpu">
+      <section class="card cpu pick" data-detail="cpu" role="button" tabindex="0" aria-expanded="false" title="프로그램별 CPU 사용량">
         <div class="line">
           <span class="tag">CPU</span>
           <span class="value" id="cpu-value">—</span>
@@ -43,7 +44,7 @@
         <div class="cores" id="cpu-cores" aria-label="코어별 사용률"></div>
       </section>
 
-      <section class="card gpu">
+      <section class="card gpu pick" data-detail="gpu" role="button" tabindex="0" aria-expanded="false" title="프로그램별 GPU 사용량">
         <div class="line">
           <span class="tag">GPU</span>
           <span class="value" id="gpu-value">—</span>
@@ -55,7 +56,7 @@
       </section>
 
       <div class="pair">
-        <section class="card mem">
+        <section class="card mem pick" data-detail="mem" role="button" tabindex="0" aria-expanded="false" title="프로그램별 메모리 사용량">
           <div class="line">
             <span class="tag">MEM</span>
             <span class="value" id="mem-percent">—</span>
@@ -74,6 +75,25 @@
         </section>
       </div>
     </main>
+    </div>
+
+    <!-- Per-program list, to the right of the widget. The window grows by
+         its width while it is open (PANEL_WIDTH in widget.rs). -->
+    <aside class="panel" id="panel" hidden>
+      <div class="panel-top" data-tauri-drag-region>
+        <span class="tag" id="panel-tag">CPU</span>
+        <span class="panel-title" data-tauri-drag-region>프로그램별</span>
+        <span class="panel-total" id="panel-total" data-tauri-drag-region></span>
+        <button id="panel-close" class="round-btn" type="button" title="목록 닫기">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path class="x" d="M4.2 4.2l7.6 7.6m0-7.6l-7.6 7.6" />
+          </svg>
+        </button>
+      </div>
+      <ol class="rows" id="panel-rows"></ol>
+      <p class="panel-msg" id="panel-msg" hidden></p>
+      <p class="panel-foot" id="panel-foot"></p>
+    </aside>
 
     <script type="module" src="main.js"></script>
   </body>

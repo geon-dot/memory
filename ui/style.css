@@ -71,6 +71,7 @@ body {
 }
 
 body {
+  display: flex;
   border: 1.5px solid var(--line);
   background: var(--page);
   color: var(--ink);
@@ -333,6 +334,161 @@ main {
 }
 .card.hot .value {
   color: var(--hot-ink);
+}
+
+/* The widget keeps its own width; the panel takes what the window adds
+   (300 - the page border = 297). */
+.widget {
+  flex: none;
+  width: 297px;
+}
+
+/* CPU, GPU and MEM open the per-program list. */
+.card.pick {
+  cursor: pointer;
+}
+.card.pick:hover,
+.card.pick:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+.card.pick[aria-expanded="true"] {
+  background: var(--soft);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--lift);
+}
+@media (prefers-color-scheme: dark) {
+  .card.pick[aria-expanded="true"] {
+    background: var(--card);
+    border-color: var(--accent);
+  }
+}
+
+/* Per-program list. One card, the colour of the reading it belongs to. */
+.panel {
+  --accent: var(--muted);
+  --soft: var(--track);
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 8px 8px 9px 0;
+  padding: 7px 10px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 3px 0 var(--lift);
+}
+.panel[hidden] {
+  display: none;
+}
+.panel[data-kind="cpu"] { --accent: var(--cpu); --soft: var(--cpu-soft); }
+.panel[data-kind="gpu"] { --accent: var(--gpu); --soft: var(--gpu-soft); }
+.panel[data-kind="mem"] { --accent: var(--mem); --soft: var(--mem-soft); }
+
+.panel-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+}
+.panel-title {
+  color: var(--muted);
+  font-size: 11px;
+}
+.panel-total {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.panel-top .round-btn {
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  margin: 0 -2px 0 2px;
+}
+.panel-top .round-btn svg {
+  width: 10px;
+  height: 10px;
+}
+
+.rows {
+  flex: 1;
+  min-height: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+.row {
+  height: 27px;
+}
+.row-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  height: 17px;
+  font-size: 11.5px;
+}
+.row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-note {
+  flex: none;
+  color: var(--muted);
+  font-size: 10px;
+}
+.row-value {
+  flex: none;
+  margin-left: auto;
+  padding-left: 6px;
+  white-space: nowrap;
+}
+.row-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+.row-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.row.rest .row-name {
+  color: var(--muted);
+}
+.row.rest .row-bar i {
+  background: var(--muted);
+  opacity: 0.55;
+}
+
+.panel-msg {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.panel-msg[hidden] {
+  display: none;
+}
+.panel-foot {
+  margin: 0;
+  height: 14px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @keyframes pop {

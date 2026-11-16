@@ -8,6 +8,7 @@ import {
   moodOf,
   holdMood,
   coreLayout,
+  detailView,
 } from './format.js';
 import { mountMascot } from './mascot.js';
 
@@ -46,6 +47,13 @@ const el = {
   diskFill: $('disk-fill'),
   pin: $('pin'),
   hide: $('hide'),
+  panel: $('panel'),
+  panelTag: $('panel-tag'),
+  panelTotal: $('panel-total'),
+  panelRows: $('panel-rows'),
+  panelMsg: $('panel-msg'),
+  panelFoot: $('panel-foot'),
+  panelClose: $('panel-close'),
 };
 const card = (node) => node.closest('.card');
 
@@ -169,8 +177,97 @@ el.hide.addEventListener('click', () => {
   if (tauri) tauri.window.getCurrentWindow().close();
 });
 
+// --- Per-program list ---------------------------------------------------
+// Clicking the CPU, GPU or MEM card opens the list for it in a panel to the
+// right; the app widens the window and starts reading that list
+// (`set_detail`), then sends it as `detail` events. Clicking the same card
+// again, or the panel's ✕, closes it.
+const DETAIL_TAG = { cpu: 'CPU', gpu: 'GPU', mem: 'MEM' };
+const DETAIL_MSG = {
+  loading: '읽는 중…',
+  empty: '지금 쓰는 프로그램이 없어요',
+  unavailable: '이 기기에서는 프로그램별 사용량을 읽을 수 없어요',
+};
+const picks = [...document.querySelectorAll('.card.pick')];
+// The list on screen: 'cpu', 'gpu', 'mem' or 'off'.
+let detail = 'off';
+
+function panelMessage(text) {
+  el.panelMsg.hidden = !text;
+  el.panelRows.hidden = Boolean(text);
+  setText(el.panelMsg, text ?? '');
+}
+
+function newRow() {
+  const row = document.createElement('li');
+  row.className = 'row';
+  row.innerHTML =
+    '<div class="row-line"><span class="row-name"></span><span class="row-note"></span>' +
+    '<span class="row-value"></span></div><div class="row-bar"><i></i></div>';
+  return row;
+}
+
+function renderDetail(list) {
+  // A list of another kind is a late one from before the last click.
+  if (list.kind !== detail) return;
+  const view = detailView(list);
+  setText(el.panelTotal, view.total);
+  setText(el.panelFoot, view.foot);
+  if (view.state !== 'list') return panelMessage(DETAIL_MSG[view.state]);
+  panelMessage(null);
+  while (el.panelRows.childElementCount < view.rows.length) el.panelRows.appendChild(newRow());
+  while (el.panelRows.childElementCount > view.rows.length) el.panelRows.lastChild.remove();
+  view.rows.forEach((r, i) => {
+    const row = el.panelRows.children[i];
+    const [name, note, value] = row.firstChild.children;
+    row.classList.toggle('rest', r.rest);
+    setText(name, r.name);
+    setText(note, r.note);
+    setText(value, r.value);
+    if (name.title !== r.name) name.title = r.name;
+    row.lastChild.firstChild.style.width = `${Math.round(r.ratio * 100)}%`;
+  });
+}
+
+async function setDetail(kind) {
+  detail = kind;
+  const open = kind !== 'off';
+  for (const pick of picks) {
+    pick.setAttribute('aria-expanded', String(pick.dataset.detail === kind));
+  }
+  if (open) {
+    el.panel.dataset.kind = kind;
+    setText(el.panelTag, DETAIL_TAG[kind] ?? 'GPU');
+    setText(el.panelTotal, '');
+    setText(el.panelFoot, '');
+    el.panelRows.replaceChildren();
+    panelMessage(DETAIL_MSG.loading);
+  }
+  // Closing hides the panel before the window shrinks, opening shows it
+  // after the window has grown, so the widget itself is never squeezed.
+  if (!open) el.panel.hidden = true;
+  try {
+    if (tauri) await tauri.core.invoke('set_detail', { kind });
+  } catch {
+    // The window could not be resized; the list still fills what there is.
+  }
+  if (open && detail === kind) el.panel.hidden = false;
+}
+
+for (const pick of picks) {
+  const toggle = () => setDetail(detail === pick.dataset.detail ? 'off' : pick.dataset.detail);
+  pick.addEventListener('click', toggle);
+  pick.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    toggle();
+  });
+}
+el.panelClose.addEventListener('click', () => setDetail('off'));
+
 if (tauri) {
   tauri.event.listen('snapshot', (event) => render(event.payload));
+  tauri.event.listen('detail', (event) => renderDetail(event.payload));
   // Chosen in the tray menu while this widget is open.
   tauri.event.listen('mascot', (event) => mascot.setMascot(event.payload));
   // The app keeps the pin (this web view has no storage that outlives it)
@@ -183,5 +280,12 @@ if (tauri) {
   // fills the widget with made-up readings, for screenshots; without it the
   // rows keep their placeholder dashes.
   const demo = new URLSearchParams(location.search).get('demo');
-  if (demo) import('./demo.js').then((m) => m.run(render, demo, location.search));
+  if (demo) {
+    import('./demo.js').then((m) => {
+      m.run(render, demo, location.search);
+      // `&detail=cpu|gpu|mem` opens that list with made-up programs.
+      const kind = new URLSearchParams(location.search).get('detail');
+      if (kind) setDetail(kind).then(() => renderDetail(m.detail(kind)));
+    });
+  }
 }
